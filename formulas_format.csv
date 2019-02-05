@@ -1,0 +1,9 @@
+element,formula,R2,p-resi,p-eq,stepV,grade,source,Cooks,residualsSD,rank
+Aluminum,I(datas$Aluminum^(-1))~I(var1^2)*I(var2^2),0.6043,0.9217,4.00E-04,I(datas$Aluminum^(-1)) ~ I(var1^2) * I(var2^2),1,BANK,2.31,0.31737,1
+Magnesium,I(datas$Magnesium^2)~I(var1^2)*I(var2^(1/2)),0.6035,0.1224,7.00E-04,I(datas$Magnesium^2) ~ I(var1^2) * I(var2^(1/2)),1,PASTURE,1.993,0.26961,1
+Zinc,I(datas$Zinc^(1/2))~I(var1^2)*log(var2),0.6534,0.5844,2.00E-04,I(datas$Zinc^(1/2)) ~ I(var1^2) * log(var2),1,BANK,2.871,0.2952,1
+Cs137,I(datas$Cs137^(1/3))~log(var1)*I(var2^2),0.6119,0.8848,1.00E-04,I(datas$Cs137^(1/3)) ~ log(var1) + I(var2^2),1,BANK,1.948,0.3098,1
+X210PbXs,(datas$X210PbXs)~I(var1^2)*I(var2^2),0.8326,0.4659,0,(datas$X210PbXs) ~ I(var1^2) + I(var2^2),1,BANK,1.067,0.28866,1
+Potassium,I(datas$Potassium^(1/2))~I(var1^2)*I(var2^(1/2)),0.7284,0.419,2.00E-04,I(datas$Potassium^(1/2)) ~ I(var1^2) + I(var2^(1/2)),1,FOREST,2.071,0.31759,1
+Uranium,I(datas$Uranium^2)~I(var1^(-1))*I(var2^(-1)),0.6924,0.8324,0.001,I(datas$Uranium^2) ~ I(var1^(-1)) * I(var2^(-1)),1,FOREST,1.248,0.32048,1
+Nickel,I(datas$Nickel^2)~var1*I(var2^2),0.8064,0.1033,0,I(datas$Nickel^2) ~ I(var2^2),1,PASTURE,3.365,0.32619,1

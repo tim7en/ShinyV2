@@ -480,6 +480,7 @@ correct <- function(datas, trg, dff, corFor) {
 
       #will be helpful in the future
       fit <- lm(eval((parse(text = as.character(f[[6]]))))) #evaluate equation
+     # print (fit)
       #get conversions needed
       vals_n <- vals[[1]][2]
       vals_n <- strsplit(vals_n, " ")
