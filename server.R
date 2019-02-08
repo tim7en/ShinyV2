@@ -16,7 +16,7 @@ source("Regressions.R")
 source("function_cor.R")
 source("modules_navtab1.R")
 source("modules_navtab2.R")
-#source ('correction_test.R')
+# source ('correction_test.R')
 source("input_mod.R")
 library("shiny")
 library("DT")
@@ -45,7 +45,7 @@ server <- function(input, output, session) {
   })
 
   output$TD_p2 <- renderDT({
-    TTout ()
+    TTout()
   })
 
   TTout <- reactive({
@@ -61,78 +61,78 @@ server <- function(input, output, session) {
   output$DT_p2 <- renderDT({
     DT_p2()
   })
-  
+
   output$selcCor <- renderUI({
-    selectInput("slcC", "Select columns with size, toc or together",choices = names(DT_p2())[-c(1,2)], multiple = TRUE, width = '100%')
+    selectInput("slcC", "Select columns with size, toc or together", choices = names(DT_p2())[-c(1, 2)], multiple = TRUE, width = "100%")
   })
-  
-  selcRem <- reactive ({
+
+  selcRem <- reactive({
     input$slcC
   })
-  
-  #option to pick columns that will not be used for correction
+
+  # option to pick columns that will not be used for correction
   output$selcRem <- renderUI({
-    selectInput("slcR", "Select columns to remove from correction",  choices = names(DT_p2())[-c(1,2)], multiple = TRUE, width = '100%')
+    selectInput("slcR", "Select columns to remove from correction", choices = names(DT_p2())[-c(1, 2)], multiple = TRUE, width = "100%")
   })
-  
-  #select p value threshold of normality for residuals
+
+  # select p value threshold of normality for residuals
   output$shapiroP <- renderUI({
     sliderInput("shapiroP", "Shapiro-Wilk Univariate Normality Test p-value:", value = 0.05, min = 0.001, max = 1, step = 0.01)
   })
-  
+
   # sliderinput for corrplot R threshold
   output$corR <- renderUI({
-    sliderInput("corR", "R2", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = F)
+    sliderInput("corR", "R", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = F)
   })
-  
-  selcCor <- reactive ({
+
+  selcCor <- reactive({
     input$slcR
   })
-  
-  output$applyCor <- renderUI ({
-    actionButton('applyCor', 'Apply corrections')
+
+  output$applyCor <- renderUI({
+    actionButton("applyCor", "Apply corrections")
   })
-  
+
   backframeDt <- eventReactive(input$applyCor, {
-    datas <- DT_p2 ()
-    datas <- corect.func(as.data.frame(datas), input$corR, input$shapiroP,input$slcC, input$slcR )
+    datas <- DT_p2()
+    datas <- corect.func(as.data.frame(datas), input$corR, input$shapiroP, input$slcC, input$slcR)
     datas <- datas[, -which(names(datas) %in% c("formula"))]
-    datas$id <- seq (1, nrow(datas))
+    datas$id <- seq(1, nrow(datas))
     if (!is.null(datas)) {
       datas
     } else {
-      
+
     }
   })
-  
-  convOptions <- reactive ({
-    datas <- backframeDt ()
+
+  convOptions <- reactive({
+    datas <- backframeDt()
   })
-  
+
   output$convOptions <- renderDT({
-    datas <- convOptions ()
+    datas <- convOptions()
     colnames(datas)[5] <- "Formula"
     datas[, 5] <- (gsub("I(datas$", replacement = "(", datas[, 5], fixed = T))
     datas[, 5] <- (gsub("datas$", replacement = "", datas[, 5], fixed = T))
     datas[, 5] <- (gsub("I", replacement = "", datas[, 5], fixed = T))
     datas[, 5] <- (gsub("logI", replacement = "log", datas[, 5], fixed = T))
-    #datas$id <- seq (1, nrow(datas))
+    # datas$id <- seq (1, nrow(datas))
     if (!is.null(datas)) {
       datas
     } else {
-      
+
     }
   })
-  
-  fDt  <- reactive ({
-    dat <- convOptions ()
+
+  fDt <- reactive({
+    dat <- convOptions()
     valTable <- dat
     varr <- valTable %>% group_by(source, element)
     f <- varr %>% arrange(-desc(residualsSD), desc(Cooks), .by_group = TRUE)
     f <- f %>%
       group_by(source, element) %>%
       mutate(rank = rank(-desc(residualsSD), ties.method = "first"))
-    f <- f[, -which(names(f) %in% c("formula", "grade", "Cooks", "residualsSD", "p-eq", "p-resi", 'p.eq', 'p.resi'))]
+    f <- f[, -which(names(f) %in% c("formula", "grade", "Cooks", "residualsSD", "p-eq", "p-resi", "p.eq", "p.resi"))]
     f <- as.data.frame(f)
     f[, 3] <- (gsub("I(datas$", replacement = "(", f[, 3], fixed = T))
     f[, 3] <- (gsub("datas$", replacement = "", f[, 3], fixed = T))
@@ -141,121 +141,120 @@ server <- function(input, output, session) {
     f[, 1] <- as.factor(f[, 1])
     f[, 3] <- as.factor(f[, 3])
     f <- f[!duplicated(f[, 3]), ]
-    return (f)
+    return(f)
   })
-  
-  convFDt  <- reactive ({
+
+  convFDt <- reactive({
     dat1 <- convOptions()
     dat2 <- finalDtrg()
-    dat <- dat1[which(dat1$id %in% dat2$id),]
-    dat <- cbind (dat[,1],0,dat[,2:ncol(dat)])
+    dat <- dat1[which(dat1$id %in% dat2$id), ]
+    dat <- cbind(dat[, 1], 0, dat[, 2:ncol(dat)])
     dat
   })
-  
-  output$convFDt <- renderDT ({
-    convFDt ()
+
+  output$convFDt <- renderDT({
+    convFDt()
   })
-  
+
   outputCorrected <- reactive({
-    req(DT_p2()) #source data
-    req(convFDt()) #formulas format
-    req(TTout()) #Target data
-    req (input$trgS)
-    
+    req(DT_p2()) # source data
+    req(convFDt()) # formulas format
+    req(TTout()) # Target data
+    req(input$trgS)
+
     datas <- DT_p2()
-    datas <-  datas[, which(!colnames(datas) %in% input$slcR)]
+    datas <- datas[, which(!colnames(datas) %in% input$slcR)]
     target <- as.data.frame(TTout())
-    target <- target[,which(!colnames(target)%in% input$slcR)]
+    target <- target[, which(!colnames(target) %in% input$slcR)]
     y <- as.data.frame(convFDt())
     x <- as.data.frame(datas)
-    output <- list ()
-    slopes <- list ()
-    drops <- list ()
-    
-    #print (x) #source
-    #print (target) #target
-    #print (input$slcC) #formula
-    
+    output <- list()
+    slopes <- list()
+    drops <- list()
+
+    # print (x) #source
+    # print (target) #target
+    # print (input$slcC) #formula
+
     for (i in seq(1, dim(target)[1])) {
-      #print (x)
-      #print (target[i,])
-      #print (y)
-      #print (input$slcC)
+      # print (x)
+      # print (target[i,])
+      # print (y)
+      # print (input$slcC)
       dat <- correct(x, target[i, ], y, input$slcC)
-      #print (dat)
-      #print (dat)
+      # print (dat)
+      # print (dat)
       output[[i]] <- dat[[1]]
       slopes[[i]] <- dat[[2]]
-      if (length(dat[[3]])>0){
+      if (length(dat[[3]]) > 0) {
         drops [[i]] <- dat[[3]]
       } else {
-        drops[[i]] <-NA
+        drops[[i]] <- NA
       }
     }
-    
-    
+
+
     y <- slopes
     slopes.DT <- data.frame(matrix(NA, nrow = 8, ncol = 3))
-    
-    for (i in seq (1,length(y[[1]]))){
-      if (length(y[[1]][[i]])<2 ){
+
+    for (i in seq(1, length(y[[1]]))) {
+      if (length(y[[1]][[i]]) < 2) {
         y[[1]][[i]] <- c(y[[1]][[i]], NA)
         y[[1]][[i]] <- c(y[[1]][[i]], NA)
-      } else if (length(y[[1]][[i]])<3 ){
+      } else if (length(y[[1]][[i]]) < 3) {
         y[[1]][[i]] <- c(y[[1]][[i]], NA)
       }
-      slopes.DT[i,] <- y[[1]][[i]]
+      slopes.DT[i, ] <- y[[1]][[i]]
     }
-    
-    colnames(slopes.DT) <- c('var1','var2','var1*var2')
-    
-    cleanT <- function (x) {
+
+    colnames(slopes.DT) <- c("var1", "var2", "var1*var2")
+
+    cleanT <- function(x) {
       x <- (gsub("I(datas$", replacement = "(", x, fixed = T))
       x <- (gsub("datas$", replacement = "", x, fixed = T))
       x <- (gsub("I", replacement = "", x, fixed = T))
       x <- (gsub("logI", replacement = "log", x, fixed = T))
     }
-    drops <- lapply (drops, cleanT)
-    
+    drops <- lapply(drops, cleanT)
+
     drops <- plyr::ldply(drops, rbind)
-    
+
     list(output, slopes.DT, drops)
   })
-  
-  output$trgS <- renderUI ({
-    selectInput('trgS', 'Target ID', choices = seq (1, nrow (TTout())), selected = 1)
+
+  output$trgS <- renderUI({
+    selectInput("trgS", "Target ID", choices = seq(1, nrow(TTout())), selected = 1)
+  })
+
+  tabList <- reactive({
+    outputCorrected() [[1]][[as.numeric(input$trgS)]]
   })
   
   output$tabList <- renderDT ({
-    outputCorrected () [[1]][[as.numeric(input$trgS)]]
-  })
-  
-  output$tabLslopes <- renderDT ({
-    outputCorrected () [[2]]
-  })
-  
-  output$tabLdrops <- renderDT ({
-    outputCorrected () [[3]]
+    tabList ()
   })
 
-  
-  
-  
+  output$tabLslopes <- renderDT({
+    outputCorrected() [[2]]
+  })
+
+  output$tabLdrops <- renderDT({
+    outputCorrected() [[3]]
+  })
   
   output$fDt <- renderDT({
-    if (!is.null(fDt())){
-      datatable(fDt (), filter = "top", options = list(
-        pageLength = 5, autoWidth = T
+    if (!is.null(fDt())) {
+      dat <- fDt ()[,c(3,2,1,6,4,5)]
+      datatable(dat, filter = "top", options = list(
+        pageLength = 5, autoWidth = F
       ))
     } else {}
-
   })
-  
+
   selectPick <- reactive({
-    #print (fDt[input$fDt_rows_selected,])
     fDt()[input$fDt_rows_selected, ]
   })
-  
+
   # observe rows selected
   output$selDat <- renderUI({
     radioButtons(
@@ -266,39 +265,37 @@ server <- function(input, output, session) {
       )
     )
   })
-  
+
   output$finalDtrg <- renderDT({
-    #v1 <- convOptions ()
     datatable(finalDtrg(), filter = "top", options = list(
-      pageLength = 5, autoWidth = T
+      pageLength = 5, autoWidth = F
     ))
   })
-  
-  finalDtrg <- reactive ({
-    if (input$selDat == "def"){
+
+  finalDtrg <- reactive({
+    req (input$selDat)
+    if (input$selDat == "def") {
       datas <- topPick()
     } else {
       datas <- selectPick()
     }
-    #print (datas)
     datas
   })
-  
-  
+
+
   output$topPick <- renderDT({
-    #print (convFDt ())
     datatable(topPick(), filter = "top", options = list(
-      pageLength = 5, autoWidth = T
+      pageLength = 5, autoWidth = F
     ))
   })
-  
+
   topPick <- reactive({
-    dat <- fDt ()
+    dat <- fDt()
     datas <- dat[which(dat$rank == 1), ]
   })
-  
+
   output$selVarplot <- renderUI({
-    #print (fDt()[which(fDt()$rank == 1),])
+    # print (fDt()[which(fDt()$rank == 1),])
     if (!is.null(input$selDat)) {
       if (input$selDat == "def") {
         selectInput("selVarplot", label = "Select Element", choices = fDt()[which(fDt()$rank == 1), 3])
@@ -307,16 +304,16 @@ server <- function(input, output, session) {
       }
     } else {}
   })
-  #callModule (corrAnalysis, 'dat1', DT_p2(),TTout(), convOptions ())
-  
+  # callModule (corrAnalysis, 'dat1', DT_p2(),TTout(), convOptions ())
+
   # regressions plot function
   regPlotfunc <- reactive({
     req(topPick())
     # req (input$selVarplot)
-    datas <- DT_p2 ()
-    
+    datas <- DT_p2()
+
     # print (input$selDat)
-    
+
     if (!is.null(input$selDat)) {
       if (input$selDat == "def") {
         if (!is.null(input$selVarplot)) {
@@ -333,25 +330,25 @@ server <- function(input, output, session) {
         } else {}
       }
     }
-    
-    #print (datas)
+
+    # print (datas)
     datas
   })
-  
+
   # regressions plot output
   output$regPlot <- renderPlot({
     req(input$selDat)
     req(input$selVarplot)
     req(selectPick())
-    req (input$slcC)
-    
+    req(input$slcC)
+
     dats <- NULL
-    dats <- selectPick ()
+    dats <- selectPick()
     slcC <- input$slcC
-    
+
     if (dim(dats)[1] < 1 & input$selDat == "sel") {} else {
       datas <- regPlotfunc()
-      
+
       if (length(slcC) > 1) {
         var1 <- as.numeric(datas[, slcC[1]])
         var2 <- as.numeric(datas[, slcC[2]])
@@ -359,11 +356,11 @@ server <- function(input, output, session) {
         var1 <- as.numeric(datas[, slcC])
         var2 <- NULL
       }
-      
+
       datas[, 3:dim(datas)[2]] <- apply(datas[, 3:dim(datas)[2]], 2, as.numeric)
-      
+
       f <- input$selVarplot
-      
+
       f <- sub("^.", "I(datas$", f)
       f <- sub("(var1", "I(var1", f, fixed = T)
       f <- sub("(var2", "I(var2", f, fixed = T)
@@ -371,20 +368,92 @@ server <- function(input, output, session) {
       f <- sub("I(datas$og(", "log(datas$", f, fixed = T)
       fit <- lm(eval(parse(text = f)))
       par(mfrow = c(1, 3))
-      
-      
+
+
       cooksd <- cooks.distance(fit)
       plot(cooksd, cex = 2, main = "Influential Obs by Cooks distance")
       lines(lowess(cooksd), col = "blue")
-      
+
       plot(fitted(fit), residuals(fit))
       lines(lowess(fitted(fit), residuals(fit)))
       title("Residual vs Fit. value ", col = "red")
-      
+
       acf(residuals(fit), main = "")
       title("Residual Autocorrelation Plot")
     }
   })
+  
+  output$xvar <- renderUI ({
+    selectInput ('xvar', 'Observed, Xvar', choices = names (tabList ())[-c(1,2)])
+  })
+  
+  output$yvar <- renderUI ({
+    selectInput ('yvar', 'Corrected, Yvar', choices = names (tabList ())[-c(1,2)])
+  })
+  
+  output$scatterplot1 <- renderScatterD3({
+    req (input$xvar)
+    req (input$yvar)
+    #scatterD3(data = data, x=mpg, y=carb,
+    mtdf <- tabList ()
+    dtorg <- DT_p2 ()
+    
+    x <- dtorg[[input$xvar]]
+    Sclass <- dtorg [,2]
+    y <- mtdf[[input$yvar]]
+    
+    scatterD3(x=x,y=y,
+              labels_size= 9, point_opacity = 1, col_var = Sclass, 
+              lines = data.frame(slope = 1, intercept = Inf),
+              #col_var=cyl, symbol_var= data$Assay,
+              #lab= paste(mpg, carb, sep="|") , lasso=TRUE,
+              #xlab= "IFN-γ", ylab= "IL-10",
+              #click_callback = "function(id, index) {
+              #  alert('scatterplot ID: ' + id + ' - Point index: ' + index) 
+              #  }", 
+              transitions= T)
+  })
+  
+  output$brack_range <- renderUI ({
+    sliderInput ('brack_rng', 'Bracket range parameter', value = 0.1, min = 0, max = 3, step = 0.05)
+  })
+  
+  tarBrackets <- reactive({
+    req (outputCorrected ())
+    req (TTout())
+    req (input$brack_rng)
+    x <- outputCorrected ()[[1]] #list of sources corrected
+    datas <- DT_p2()
+    datas <- datas[, which(!names(datas) %in% names(x[[1]]))]
+    y <- trgs() #list of targets corrected
+    
+    dat <- NULL
+    trg <- NULL
+    for (i in seq (1,nrow(y))){
+      x[[i]]<- cbind (x[[i]], datas)
+      l <- bracketT (x[[i]],y[i,], input$brack_rng, input$slcR)
+      dat <- rbind (dat, l[[1]])
+      trg <- c (trg, l[[2]])
+    }
+    
+    levels(dat[,1]) <- as.character (dat[,1])
+    
+    return (list(dat, trg))
+    
+  })
+  
+  output$trgBrkts <- renderDT ({
+    req (tarBrackets ())
+    dat <- tarBrackets ()
+    selection <- dat[[2]]
+    trgDat <<- dat
+    
+    DT::datatable(dat[[1]]) %>% formatStyle(
+      c(colnames(dat[[1]])),
+      backgroundColor = styleEqual(selection, rep("lightsalmon", length(selection)))
+    )
+  })
+  
   
 }
 
@@ -641,12 +710,12 @@ ui <- dashboardPage(
                             column(
                               width = 3,
                               mat_par("dat2")
-                            ),
-                            column(
-                              width = 12,
-                              br(),
-                              srcDCor("dat2")
                             )
+                          ),
+                          column(
+                            width = 12,
+                            br(),
+                            srcDCor("dat2")
                           )
                         )
                       )
@@ -665,73 +734,104 @@ ui <- dashboardPage(
             "Sources",
             column(
               width = 12,
-              DTOutput("DT_p2")
+              DTOutput("DT_p2"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
             )
           ),
           tabPanel(
             "Target",
             column(
               width = 12,
-              DTOutput("TD_p2")
+              DTOutput("TD_p2"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
             )
           ),
           tabPanel(
-            'Corrections',
-            column(
-              width = 12,
-              uiOutput ('selcCor'),#,
-              uiOutput ('selcRem'),
-              uiOutput ('shapiroP'),
-              uiOutput ('corR'),
-              uiOutput ('applyCor'),
-              withSpinner(DTOutput ('convOptions'))
-            )
-          ),
-          tabPanel(
-            'Target corrected',
-              box(
-                title = "Formulas", status = "success", height =
-                  "auto", solidHeader = T,
-                  DTOutput('fDt')
+            "Corrections",
+            sidebarLayout(
+              sidebarPanel(
+                
+                uiOutput("selcCor"), # ,
+                uiOutput("selcRem"),
+                uiOutput("shapiroP"),
+                uiOutput("corR"),
+                uiOutput("applyCor")
               ),
-            box(
-              title = "Plots", status = "success", height =
-                "auto", solidHeader = T,
-              fluidRow (
-                column (
-                  width =6,
-                  fluidRow (
-                    column(
-                      width = 6,
-                      uiOutput ('selDat')
-                    ),
-                    column (
-                      width =6,
-                      uiOutput ('selVarplot')
-                    )
-                  ),
-                  plotOutput('regPlot')
+              mainPanel(
+                box(
+                  title = "Available options", status = "success", height =
+                    "auto", solidHeader = T, width = "auto",
+                  withSpinner(DTOutput("convOptions")), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 )
               )
-            ),
-            fluidRow (
-              column (
-                width =6,
-                DTOutput ('topPick')
+              
+            )
+          ),
+          tabPanel(
+            "Target corrected",
+            fluidRow(
+              column(
+                width = 12,
+                box(
+                  title = "Formulas", status = "success", height =
+                    "auto", solidHeader = T,
+                  DTOutput("fDt"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                ),
+                box(
+                  title = "Selected", status = "primary", height =
+                    "auto", solidHeader = T,
+                  DTOutput("finalDtrg"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                )
               ),
-              column (
-                width =6,
-                DTOutput ('finalDtrg')
+              column(
+                width = 12,
+                box(
+                  title = "Top pick", status = "success", height =
+                    "auto", solidHeader = T,
+                  DTOutput("topPick"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                ),
+                box(
+                  title = "Plots", status = "success", height =
+                    "auto", solidHeader = T,
+                  uiOutput("selDat"),
+                  uiOutput("selVarplot"),
+                  plotOutput("regPlot")
+                )
               )
             )
           ),
-          tabPanel (
-            'Corrected Data',
-            uiOutput ('trgS'),
-            DTOutput ('tabList'),
-            DTOutput ('tabLslopes'),
-            DTOutput ('tabLdrops')
-            
+          tabPanel(
+            "Corrected Data",
+            tabsetPanel(
+              tabPanel (
+                'Data',
+                fluidRow (
+                  column(
+                    width = 12,
+                      uiOutput("trgS"),
+                      DTOutput("tabList"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                    ),
+                      column (
+                        width = 6,
+                        DTOutput("tabLslopes"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                      ),
+                      column (
+                        width = 6,
+                        DTOutput("tabLdrops"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                    )
+                  
+                )
+              ),
+              tabPanel (
+                'Plot',
+                uiOutput ('xvar'),
+                uiOutput ('yvar'),
+                scatterD3Output("scatterplot1")
+              )
+            )
+          ),
+          tabPanel(
+            "Bracket test",
+            uiOutput ('brack_range'),
+            DTOutput ('trgBrkts'), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
           )
         )
       )

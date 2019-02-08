@@ -782,3 +782,36 @@ stepwiseDFA <- function(l) {
   
   return(DFA_l)
 }
+
+
+bracketT<- function (x,y, r, nrm) {
+  drops <- c(nrm)
+  #DF[ , !(names(DF) %in% drops)]
+  
+  d <- y
+  y <- y[,-c(1,2)]
+  x <- x[, 3:ncol(x)]
+  x <- apply(x, 2, as.numeric)
+
+  #which(!names(datas) %in% names(x[[1]])
+  x <- as.data.frame(x)
+  x <- x[,!(names(x) %in% drops)]
+  y <- y[,!(names(y) %in% drops)]
+  
+  colSrc <- match(colnames(x), colnames(y))
+  
+  yNum <- y[, na.omit(colSrc)]
+  YNum_2 <- y[, na.omit(colSrc)]
+  upperL <- x * (1 + r)
+  lowerL <- x * (1 - r)
+  l <- list()
+  for (i in seq(1, ncol(upperL))) {
+    yNum[(which(yNum [, i ] > max(upperL[, i]) | yNum[, i] < min(lowerL[, i]))), i] <- paste(yNum[(which(yNum [, i ] > max(upperL[, i]) | yNum[, i] < min(lowerL[, i]))), i], "*", sep = "")
+    l[[i]] <- yNum[(which(YNum_2 [, i ] > max(upperL[, i]) | YNum_2[, i] < min(lowerL[, i]))), i]
+  }
+  dat <- cbind (d[,c(1,2)], yNum)
+  dat <- cbind (dat, d[,!(names(d) %in% names(dat))])
+  
+  dat <- cbind(d[, c(1, 2)], yNum) #take first and second column and combine them
+  list(dat, c(na.omit(unlist(l))))
+}
