@@ -118,14 +118,17 @@ if (interactive()) {
     
     observe (
       if (!is.null(input$tree)){
-        # output$Table <- renderPrint({
-        #   
-        #   names(as.data.frame(get_selected(input$tree, format = "slices")))
-        #   
-        # })
+        l <- names(unlist(get_selected(input$tree, format = c("slices"))))
+        d <- NULL
         
-        print (unlist(get_selected(input$tree, format = c("classid"))))
-        print (input$tree)
+        if (!is.null(l)){
+        for (i in seq (1, length (l))) {
+          d <- rbind (d,unlist(strsplit(l[i], "[.]")) )
+        }
+        
+          d<- d[-c(which (d[,1] == d[,2])),]
+          print (data.frame(d))
+        }
       }
 
     )
