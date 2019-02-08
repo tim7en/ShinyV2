@@ -118,7 +118,14 @@ if (interactive()) {
     
     observe (
       if (!is.null(input$tree)){
-        print (unlist(get_selected(input$tree, format = c("names"))))
+        # output$Table <- renderPrint({
+        #   
+        #   names(as.data.frame(get_selected(input$tree, format = "slices")))
+        #   
+        # })
+        
+        print (unlist(get_selected(input$tree, format = c("classid"))))
+        print (input$tree)
       }
 
     )

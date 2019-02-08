@@ -436,8 +436,11 @@ server <- function(input, output, session) {
       trg <- c (trg, l[[2]])
     }
     
-    levels(dat[,1]) <- as.character (dat[,1])
-    
+    #print ()
+    #print (dat)
+    #levels(dat[,1]) <- as.character (dat[,1])
+    dat[,1] <- factor (as.character(dat[,1]), levels = c(as.character(dat[,1])))
+
     return (list(dat, trg))
     
   })
