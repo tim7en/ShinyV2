@@ -288,25 +288,25 @@ UseUnMixing <- function(samples, sources, weights, method = "Nelder-Mead") {
     SigmaPSi <- par %*% src
     return(sum(((Conc - SigmaPSi) / Conc)^2 * wt))
   }
+  
   GOF <- function(par, Conc, src, wt) {
     # Recover all source proportions
     par <- Iclr(c(0 - sum(par), par))
     SigmaPSi <- par %*% src
     return(-(1 - (sqrt(sum(((Conc - SigmaPSi) / Conc)^2 * wt / 100))) / dim(src)[2]))
   }
+  
   GOF_score <- double(nrow(samples))
   Pctgs <- matrix(0, nrow = nrow(samples), ncol = nrow(sources))
   # Step through each row in samples
   start <- rep(0, nrow(sources) - 1L)
-  target <- samples [, -c(1, 2)]
 
   for (i in seq(nrow(samples))) {
     best <- 0
-    WT <- weights[which(weights[, 1] %in% samples[i, 1]), ]
-    WT <- as.numeric(as.character(t(WT)))[-1]
+    WT <- weights
     for (j in seq(nrow(sources))) {
       src <- rbind(sources[j, , drop = FALSE], sources[-j, , drop = FALSE])
-      ret <- optim(start, GOF, method = method, Conc = target[i, ], src = src, wt = WT)
+      ret <- optim(start, GOF, method = method, Conc = samples, src = src, wt = WT)
       ret$value <- sqrt(ret$value^2)
       if (ret$value > best) { # save the results
         best <- ret$value
@@ -317,15 +317,11 @@ UseUnMixing <- function(samples, sources, weights, method = "Nelder-Mead") {
   }
   colnames(Pctgs) <- rownames(sources)
   rownames(Pctgs) <- samples[, 1]
+
   return(cbind(Pctgs, GOF_score = GOF_score))
 }
 
-# way is transformnames()
-# datas is x6()[[1]]
-# Nsamples is input$Nsamples
-# stat is input$stat
-# checkbox is input$inCheckboxGroup
-# origdf is x$df
+
 ranNumberGenUnmixing <- function(datas, way, Nsamples, stat, checkbox, origdf) {
   datas <- datas[, -ncol(datas)]
   l <- as.character(unique(datas[, 2]))
@@ -713,7 +709,7 @@ stepwiseDFA <- function(l) {
       actu <- eval(formula(object)[[2]], data)
       conf <- table(pred, actu)
       1 - sum(diag(conf)) / sum(conf)
-      print(conf)
+      #print(conf)
     }
     
     # confusion matrix and percentgood#
@@ -748,7 +744,7 @@ stepwiseDFA <- function(l) {
     for (e in 1:(length(results[[1]]))) {
       indvformula <- paste("lda(SourceType~", as.character(results[[e, 1]]), sep = "")
       indvformula <- paste(indvformula, ",data=datas,prior=priors,CV=TRUE,tol=", 0.001, ")")
-      print(indvformula)
+      #print(indvformula)
       # Sys.sleep(15)
       fitindv <- eval(parse(text = indvformula))
       confusionCVprINDV <- table(fitindv$class, SourceType)
@@ -814,4 +810,8 @@ bracketT<- function (x,y, r, nrm) {
   
   dat <- cbind(d[, c(1, 2)], yNum) #take first and second column and combine them
   list(dat, c(na.omit(unlist(l))))
+}
+
+grepL <- function(x) {
+  return(grep("*", x, fixed = T))
 }

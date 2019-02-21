@@ -92,6 +92,10 @@ server <- function(input, output, session) {
   output$applyCor <- renderUI({
     actionButton("applyCor", "Apply corrections")
   })
+  
+  output$treeAcc <- renderUI ({
+    actionButton ('treeAcc', 'Reset table')
+  })
 
   backframeDt <- eventReactive(input$applyCor, {
     datas <- DT_p2()
@@ -172,18 +176,8 @@ server <- function(input, output, session) {
     slopes <- list()
     drops <- list()
 
-    # print (x) #source
-    # print (target) #target
-    # print (input$slcC) #formula
-
     for (i in seq(1, dim(target)[1])) {
-      # print (x)
-      # print (target[i,])
-      # print (y)
-      # print (input$slcC)
       dat <- correct(x, target[i, ], y, input$slcC)
-      # print (dat)
-      # print (dat)
       output[[i]] <- dat[[1]]
       slopes[[i]] <- dat[[2]]
       if (length(dat[[3]]) > 0) {
@@ -227,11 +221,12 @@ server <- function(input, output, session) {
   })
 
   tabList <- reactive({
+    req (outputCorrected())
     outputCorrected() [[1]][[as.numeric(input$trgS)]]
   })
-  
-  output$tabList <- renderDT ({
-    tabList ()
+
+  output$tabList <- renderDT({
+    tabList()
   })
 
   output$tabLslopes <- renderDT({
@@ -241,10 +236,10 @@ server <- function(input, output, session) {
   output$tabLdrops <- renderDT({
     outputCorrected() [[3]]
   })
-  
+
   output$fDt <- renderDT({
     if (!is.null(fDt())) {
-      dat <- fDt ()[,c(3,2,1,6,4,5)]
+      dat <- fDt()[, c(3, 2, 1, 6, 4, 5)]
       datatable(dat, filter = "top", options = list(
         pageLength = 5, autoWidth = F
       ))
@@ -273,7 +268,7 @@ server <- function(input, output, session) {
   })
 
   finalDtrg <- reactive({
-    req (input$selDat)
+    req(input$selDat)
     if (input$selDat == "def") {
       datas <- topPick()
     } else {
@@ -295,7 +290,6 @@ server <- function(input, output, session) {
   })
 
   output$selVarplot <- renderUI({
-    # print (fDt()[which(fDt()$rank == 1),])
     if (!is.null(input$selDat)) {
       if (input$selDat == "def") {
         selectInput("selVarplot", label = "Select Element", choices = fDt()[which(fDt()$rank == 1), 3])
@@ -304,7 +298,6 @@ server <- function(input, output, session) {
       }
     } else {}
   })
-  # callModule (corrAnalysis, 'dat1', DT_p2(),TTout(), convOptions ())
 
   # regressions plot function
   regPlotfunc <- reactive({
@@ -382,82 +375,263 @@ server <- function(input, output, session) {
       title("Residual Autocorrelation Plot")
     }
   })
-  
-  output$xvar <- renderUI ({
-    selectInput ('xvar', 'Observed, Xvar', choices = names (tabList ())[-c(1,2)])
+
+  output$xvar <- renderUI({
+    selectInput("xvar", "Observed, Xvar", choices = names(tabList())[-c(1, 2)])
   })
-  
-  output$yvar <- renderUI ({
-    selectInput ('yvar', 'Corrected, Yvar', choices = names (tabList ())[-c(1,2)])
+
+  output$yvar <- renderUI({
+    selectInput("yvar", "Corrected, Yvar", choices = names(tabList())[-c(1, 2)])
   })
-  
+
   output$scatterplot1 <- renderScatterD3({
-    req (input$xvar)
-    req (input$yvar)
-    #scatterD3(data = data, x=mpg, y=carb,
-    mtdf <- tabList ()
-    dtorg <- DT_p2 ()
-    
+    req(input$xvar)
+    req(input$yvar)
+    # scatterD3(data = data, x=mpg, y=carb,
+    mtdf <- tabList()
+    dtorg <- DT_p2()
+
     x <- dtorg[[input$xvar]]
-    Sclass <- dtorg [,2]
+    Sclass <- dtorg [, 2]
     y <- mtdf[[input$yvar]]
-    
-    scatterD3(x=x,y=y,
-              labels_size= 9, point_opacity = 1, col_var = Sclass, 
-              lines = data.frame(slope = 1, intercept = Inf),
-              #col_var=cyl, symbol_var= data$Assay,
-              #lab= paste(mpg, carb, sep="|") , lasso=TRUE,
-              #xlab= "IFN-γ", ylab= "IL-10",
-              #click_callback = "function(id, index) {
-              #  alert('scatterplot ID: ' + id + ' - Point index: ' + index) 
-              #  }", 
-              transitions= T)
+
+    scatterD3(
+      x = x, y = y,
+      labels_size = 9, point_opacity = 1, col_var = Sclass,
+      lines = data.frame(slope = 1, intercept = Inf),
+      # col_var=cyl, symbol_var= data$Assay,
+      # lab= paste(mpg, carb, sep="|") , lasso=TRUE,
+      # xlab= "IFN-<U+03B3>", ylab= "IL-10",
+      # click_callback = "function(id, index) {
+      #  alert('scatterplot ID: ' + id + ' - Point index: ' + index)
+      #  }",
+      transitions = T
+    )
   })
-  
-  output$brack_range <- renderUI ({
-    sliderInput ('brack_rng', 'Bracket range parameter', value = 0.1, min = 0, max = 3, step = 0.05)
+
+  output$brack_range <- renderUI({
+    sliderInput("brack_rng", "Bracket range parameter", value = 0.1, min = 0, max = 3, step = 0.05)
   })
-  
+
   tarBrackets <- reactive({
-    req (outputCorrected ())
-    req (TTout())
-    req (input$brack_rng)
-    x <- outputCorrected ()[[1]] #list of sources corrected
+    req(outputCorrected())
+    req(TTout())
+    req(input$brack_rng)
+    x <- outputCorrected()[[1]] # list of sources corrected
     datas <- DT_p2()
     datas <- datas[, which(!names(datas) %in% names(x[[1]]))]
-    y <- trgs() #list of targets corrected
-    
+    y <- trgs() # list of targets corrected
+
     dat <- NULL
     trg <- NULL
-    for (i in seq (1,nrow(y))){
-      x[[i]]<- cbind (x[[i]], datas)
-      l <- bracketT (x[[i]],y[i,], input$brack_rng, input$slcR)
-      dat <- rbind (dat, l[[1]])
-      trg <- c (trg, l[[2]])
+    for (i in seq(1, nrow(y))) {
+      x[[i]] <- cbind(x[[i]], datas)
+      l <- bracketT(x[[i]], y[i, ], input$brack_rng, input$slcR)
+      dat <- rbind(dat, l[[1]])
+      trg <- c(trg, l[[2]])
     }
-    
-    #print ()
-    #print (dat)
-    #levels(dat[,1]) <- as.character (dat[,1])
-    dat[,1] <- factor (as.character(dat[,1]), levels = c(as.character(dat[,1])))
 
-    return (list(dat, trg))
-    
+    dat[, 1] <- factor(as.character(dat[, 1]), levels = c(as.character(dat[, 1])))
+
+    list(dat, trg)
   })
-  
-  output$trgBrkts <- renderDT ({
-    req (tarBrackets ())
-    dat <- tarBrackets ()
+
+  output$trgBrkts <- renderDT({
+    req(tarBrackets())
+    dat <- tarBrackets()
     selection <- dat[[2]]
-    trgDat <<- dat
-    
+    #trgDat <<- dat
+
     DT::datatable(dat[[1]]) %>% formatStyle(
       c(colnames(dat[[1]])),
       backgroundColor = styleEqual(selection, rep("lightsalmon", length(selection)))
     )
   })
+
+  trgdropList <- reactive({
+    req (tarBrackets())
+    dat <- tarBrackets()
+    x <- dat[[1]]
+    trg <- list()
+    for (i in seq(1, nrow(x))) {
+      k <- (colnames(x)[grepL(x[i, ])])
+
+      if (length(k) == 0) {
+        trg[[i]] <- "None"
+      }
+      else {
+        trg[[i]] <- k
+      }
+    }
+    names(trg) <- x$SampleName
+    trg
+  })
+
+
+
+  # treeX <- reactive ({
+  #   atatrib <- function(x) {
+  #     structure(x, stselected = TRUE)
+  #   }
+  #   trg <- trgdropList()
+  #   trg <- (list("bigtree" = (trg)))
+  # 
+  #   vL <- NULL
+  #   k <- 1
+  #   for (i in seq(1, length(trg$bigtree))) {
+  #     v <- paste("trg$bigtree$target", paste(i, "$", sep = ""), sep = "")
+  #     for (j in seq(1, length(trg$bigtree[[i]]))) {
+  #       vName <- paste(v, trg$bigtree[[i]][j], sep = "")
+  #       vName <- paste(vName, paste(" <- ", j, sep = ""), sep = "")
+  #       vL[k] <- vName
+  #       k <- k + 1
+  #     }
+  #   }
+  #   
+  #   for (i in seq(1, length(vL))) {
+  #     options(warn = -1)
+  #     eval(parse(text = vL[i]))
+  #     options(warn = 1)
+  #   }
+  # 
+  #   atatrib <- function(x) {
+  #     x[which(names(x) == "")] <- NULL
+  #     if (any(names(x) == "None")) {
+  #       structure(x, stselected = FALSE)
+  #     } else {
+  #       structure(x, stselected = TRUE)
+  #     }
+  #   }
+  # 
+  #   trg <- lapply(trg$bigtree, atatrib)
+  #   trg
+  # })
+
+  # output$tree <- renderTree ({
+  #   treeX ()
+  # })
   
+  # d <- reactive ({
+  #   l <- names(unlist(get_selected(input$tree, format = c("slices"))))
+  #   d <- NULL
+  #   
+  #   if (!is.null(l)) {
+  #     for (i in seq(1, length(l))) {
+  #       d <- rbind(d, unlist(strsplit(l[i], "[.]")))
+  #     }
+  #     d <- d[-c(which(d[, 1] == d[, 2])), ]
+  #   }
+  #   d
+  # })
   
+  output$trg.drops <- renderDT(
+    d (), selection = 'multiple'  
+  )
+  
+  d <- reactive ({
+    req (trgdropList())
+    trg <- trgdropList()
+    dat <- NULL
+    for (i in seq (1, length (trg))){
+      tname <- names (trg)[i]
+      for (j in seq (1, length (trg[i]))) {
+        val <- trg[i][[j]]
+        dat <- rbind (dat, cbind(tname,val)) 
+      }
+    }
+    dat
+  })
+
+  dfaReactive <- reactive({
+    req(outputCorrected())
+    sourceList <- outputCorrected()[[1]]
+    d <- data.frame(d())
+    #print (d)
+    if (!is.null(input$trg.drops_rows_selected)){
+      d <- d[-input$trg.drops_rows_selected,]
+    }
+    d[, 1] <- as.character(d[, 1])
+    d[, 2] <- as.character(d[, 2])
+    x <- tarBrackets()[[1]]
+    x[, 1] <- as.character(x[, 1])
+
+    y <- sourceList
+
+    for (i in seq(1, nrow(d))) {
+      drops <- d[, 2][which(d[, 1] == d[, 1][i])]
+      dat <- y[[which(x[, 1] == d[, 1][i])]]
+      y[[which(x[, 1] == d[, 1][i])]] <- dat[, which(!names(dat) %in% c(drops))]
+    }
+    dat <- stepwiseDFA(y)
+    dat
+  })
+
+
+  dfaList_x <- reactive({
+    req(dfaReactive())
+    req(TTout())
+    datas <- dfaReactive()
+    dfaList <- NULL
+    sourceList <- datas
+    targetList <- TTout()
+
+    for (i in seq(1, nrow(targetList))) {
+      dfa <- data.frame(matrix(data = 0, nrow = 1, ncol = (length(colnames(targetList)) - 2)))
+      names(dfa) <- names(targetList)[-c(1, 2)]
+      datas_i <- datas[[i]]
+      datas_i <- t(datas_i)
+      dfa[, match(datas_i[1, ], names(dfa))] <- as.numeric(datas_i[3, ])
+      dfaList <- rbind(dfaList, dfa)
+    }
+    dfaList
+  })
+
+  output$dfaList <- renderDT(
+    dfaList_x()
+  )
+
+  mixingOutput <- reactive({
+    req(dfaList_x())
+    dat <- outputCorrected()[[1]]
+    DFA_l <- dfaList_x()
+    targets <- as.data.frame(TTout())
+    output <- NULL
+    datOutput <- NULL
+    for (j in seq(1:length(dat))) {
+      datas <- dat[[j]]
+      target <- as.data.frame(targets[j, ])
+      names(target) <- names(targets)
+      DFA <- as.data.frame(DFA_l[j, ])
+      names(DFA) <- names(DFA_l)
+      datas <- as.data.frame(datas)
+      rownames(datas) <- datas [, 1]
+      datas <- datas[, -1]
+      datas <- getSubsetmean(datas)
+      target <- target[, which(names(target) %in% colnames(datas))]
+      DFA <- DFA[(which(colnames(DFA) %in% colnames(datas)))]
+      DFA <- DFA[, colSums(DFA != 0) > 0]
+      target <- target[, which(names(target) %in% colnames(DFA))]
+      datas <- datas[, which(colnames(datas) %in% colnames(DFA))]
+
+      if (1 == 1) {
+        output <- UseUnMixing(target, datas, DFA, method = "Nelder-Mead")
+        rn <- rownames(output)
+        output <- output[order(rn), ]
+      } else {
+        result <- UseUnMixing(target, datas, DFA, method = "Nelder-Mead")
+        output <- rbind(output, result)
+        rn <- rownames(output)
+        output <- output[order(rn), ]
+      }
+      datOutput <- rbind(datOutput, output)
+    }
+    rownames(datOutput) <- seq(1, nrow(datOutput))
+    round(datOutput, 3)
+  })
+
+  output$mixingOutput <- renderDT({
+    mixingOutput()
+  })
 }
 
 # User interface side of the user input
@@ -751,7 +925,6 @@ ui <- dashboardPage(
             "Corrections",
             sidebarLayout(
               sidebarPanel(
-                
                 uiOutput("selcCor"), # ,
                 uiOutput("selcRem"),
                 uiOutput("shapiroP"),
@@ -765,7 +938,6 @@ ui <- dashboardPage(
                   withSpinner(DTOutput("convOptions")), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 )
               )
-              
             )
           ),
           tabPanel(
@@ -804,57 +976,79 @@ ui <- dashboardPage(
           tabPanel(
             "Corrected Data",
             tabsetPanel(
-              tabPanel (
-                'Data',
-                fluidRow (
+              tabPanel(
+                "Data",
+                fluidRow(
                   column(
                     width = 12,
-                      uiOutput("trgS"),
-                      DTOutput("tabList"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
-                    ),
-                      column (
-                        width = 6,
-                        DTOutput("tabLslopes"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
-                      ),
-                      column (
-                        width = 6,
-                        DTOutput("tabLdrops"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
-                    )
-                  
+                    uiOutput("trgS"),
+                    DTOutput("tabList"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  ),
+                  column(
+                    width = 6,
+                    DTOutput("tabLslopes"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  ),
+                  column(
+                    width = 6,
+                    DTOutput("tabLdrops"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  )
                 )
               ),
-              tabPanel (
-                'Plot',
-                uiOutput ('xvar'),
-                uiOutput ('yvar'),
+              tabPanel(
+                "Plot",
+                uiOutput("xvar"),
+                uiOutput("yvar"),
                 scatterD3Output("scatterplot1")
               )
             )
           ),
           tabPanel(
             "Bracket test",
-            uiOutput ('brack_range'),
-            DTOutput ('trgBrkts'), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+            fluidPage(
+              uiOutput("brack_range"),
+              sidebarLayout(
+                sidebarPanel(
+                  DTOutput("trg.drops"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  # shinyTree("tree",
+                  #   checkbox = TRUE, search = TRUE, theme = "proton", themeIcons = F,
+                  #   themeDots = F
+                  # ),
+                  # uiOutput('treeAcc')
+                ),
+                mainPanel(
+                  DTOutput("trgBrkts"),
+                  style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                )
+              )
+            )#,
+            #DTOutput("trg.drops")
           )
         )
-      )
-    ),
-    tabItems(
-      tabItem( # First tab content
+      ),
+      tabItem(
         tabName = "DFA",
-        tabsetPanel()
-      )
-    ),
-    tabItems(
-      tabItem( # First tab content
+        fluidPage(
+          fluidRow(
+            column(
+              width = 12,
+              withSpinner(DTOutput("dfaList")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+            )
+          )
+        )
+      ),
+      tabItem(
         tabName = "mixmod",
-        tabsetPanel()
+        fluidPage(
+          fluidRow(
+            column(
+              width = 12,
+              withSpinner(DTOutput("mixingOutput")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+            )
+          )
+        )
       )
     )
   )
 )
-
-
-
 # Run the app ----
 shinyApp(ui, server)

@@ -1,8 +1,6 @@
 x <- trgDat[[1]] # target data table with marked values
 
-y <- read.csv("SourceData.csv")
-y <- na.omit(y)
-y <- list(y, y, y, y, y, y, y, y, y, y)
+
 # #1. Create a list for each target list column names where there is a symbol *
 # #2. Show 1. target and all column-names selected.
 # #3. Select all column names and targets with
@@ -57,23 +55,23 @@ if (interactive()) {
     x2 <- reactive({
       x
     })
-    output$clCh <- renderUI({
-      req(x2())
-      prettyCheckboxGroup("checkGroup",
-        label = h3("Targets"),
-        choices = as.character(x$SampleName),
-        selected = as.character(x[which(unlist(lapply(trg, length)) > 0), 1]), shape = "curve"
-      )
-    })
+    # #output$clCh <- renderUI({
+    #   req(x2())
+    #   prettyCheckboxGroup("checkGroup",
+    #     label = h3("Targets"),
+    #     choices = as.character(x$SampleName),
+    #     selected = as.character(x[which(unlist(lapply(trg, length)) > 0), 1]), shape = "curve"
+    #   )
+    # })
 
-    output$rwCh <- renderUI({
-      req(x2())
-      prettyCheckboxGroup("checkGroup",
-        label = h3("Columns"),
-        choices = names(x),
-        selected = unique(na.omit(unlist(trg))), inline = T, width = "auto", shape = "curve"
-      )
-    })
+    # #output$rwCh <- renderUI({
+    #   req(x2())
+    #   prettyCheckboxGroup("checkGroup",
+    #     label = h3("Columns"),
+    #     choices = names(x),
+    #     selected = unique(na.omit(unlist(trg))), inline = T, width = "auto", shape = "curve"
+    #   )
+    # })
 
     output$tree <- renderTree({
       atatrib <- function(x) {
@@ -127,11 +125,30 @@ if (interactive()) {
         }
         
           d<- d[-c(which (d[,1] == d[,2])),]
-          print (data.frame(d))
+          d <<-d
         }
       }
-
     )
   }
   shinyApp(ui, server)
 }
+
+datas <- as.data.frame (d)
+
+y <- read.csv("SourceData.csv")
+y <- na.omit(y)
+y <- list(y, y, y, y, y, y, y, y, y, y)
+
+for (i in seq (1, nrow(datas))){
+  drops <- datas$V2[which (datas[,1] == datas[,1][i])]
+  dat <- y[[which (datas[,1][i] == x[,1])]]
+  y[[which (datas[,1][i] == x[,1])]] <- dat[,which (!names(dat) %in% c(drops))]
+}
+
+stepwiseDFA (y)
+
+#for (j in seq (1, length (y))) {print (dim(y[[j]]))}
+
+
+#y[[which (as.character(x$SampleName) == datas$V1[1])]]
+
