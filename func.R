@@ -288,7 +288,7 @@ UseUnMixing <- function(samples, sources, weights, method = "Nelder-Mead") {
   }
   
   samples <- t(as.data.frame (samples))
-  print (samples)
+  #print (samples)
   GOF_score <- double(nrow(samples))
   Pctgs <- matrix(0, nrow = nrow(samples), ncol = nrow(sources))
   # Step through each row in samples

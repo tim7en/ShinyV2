@@ -554,6 +554,7 @@ server <- function(input, output, session) {
       DFA <- DFA_l[i,]
       x <- l[[i]]
       uniSource <- unique (x[,2])
+      uniSource <- as.character (uniSource)
       split <- input$split
       modelOutput <- NULL
       print (paste0('Mixing source: ', i))
@@ -597,23 +598,30 @@ server <- function(input, output, session) {
           output <- UseUnMixing(x, datas, DFA, method = "Nelder-Mead")
         }
         clusterExport(cl, list ('UseUnMixing', 'datas', 'DFA', 'dat', 'optimMix'), envir=environment())
-        #print (paste0('Started model: ', j))
         output <- t(parApply(cl, dat, 1, optimMix))
+        output <- cbind (output,  j)
         modelOutput <- rbind (modelOutput, output)
-        #print (paste0('Done model: ', j))
         stopCluster(cl)
       }
+      modelOutput <- cbind (modelOutput, i)
+      
       finalDat <- rbind (finalDat, modelOutput)
+      finalDat <- round (finalDat, 3)
     }
-    round(finalDat, 3)
+    x <- as.data.frame (finalDat)
+    x[,(ncol(x)-1)] <- paste0('Monte Carlo: ', x[,(ncol(x)-1)])
+    x[,(ncol(x))] <- paste0('Target: ', x[,(ncol(x))])
+    colnames (x) <- c(uniSource, 'GOF', 'Monte-Carlo','Target')
+    x
   })
 
   
   output$mixingOutput <- renderDT({
-    mixingOutput()
+    x <- as.data.frame(mixingOutput())
+    dat <<-x
+    x
   })
-  
-  
+
 }
 
 # User interface side of the user input
