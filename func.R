@@ -158,15 +158,6 @@ getSubsetmean <- function(x) {
   dfoutput
 }
 
-
-
-
-
-
-
-
-
-
 untransform <- function(x, y, un) {
   loc1 <- which(y[(which(rownames(y) %in% un)), ] == "x^2")
   if (length(loc1) > 0) {
@@ -296,10 +287,13 @@ UseUnMixing <- function(samples, sources, weights, method = "Nelder-Mead") {
     return(-(1 - (sqrt(sum(((Conc - SigmaPSi) / Conc)^2 * wt / 100))) / dim(src)[2]))
   }
   
+  samples <- t(as.data.frame (samples))
+  print (samples)
   GOF_score <- double(nrow(samples))
   Pctgs <- matrix(0, nrow = nrow(samples), ncol = nrow(sources))
   # Step through each row in samples
   start <- rep(0, nrow(sources) - 1L)
+
 
   for (i in seq(nrow(samples))) {
     best <- 0
@@ -311,15 +305,20 @@ UseUnMixing <- function(samples, sources, weights, method = "Nelder-Mead") {
       if (ret$value > best) { # save the results
         best <- ret$value
         GOF_score[i] <- ret$value
+        #GOF_score <- ret$value
         Pctgs[i, ] <- Iclr(append(ret$par, 0 - sum(ret$par), after = j - 1L))
+        #Pctgs <- Iclr(append(ret$par, 0 - sum(ret$par), after = j - 1L))
       }
     }
   }
+  
   colnames(Pctgs) <- rownames(sources)
-  rownames(Pctgs) <- samples[, 1]
-
+  rownames(Pctgs) <- rownames (samples)
   return(cbind(Pctgs, GOF_score = GOF_score))
 }
+
+
+
 
 
 ranNumberGenUnmixing <- function(datas, way, Nsamples, stat, checkbox, origdf) {

@@ -20,6 +20,8 @@ source("modules_navtab2.R")
 source("input_mod.R")
 library("shiny")
 library("DT")
+library (parallel)
+numCores <- detectCores()-1
 # source ('correction_test.R')
 
 
@@ -84,6 +86,10 @@ server <- function(input, output, session) {
   output$corR <- renderUI({
     sliderInput("corR", "R", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = F)
   })
+  
+  output$split <- renderUI ({
+    sliderInput ('split', 'Split proportion', value = 0.9, min = 0.1, max = 0.99, step = 0.05, animate = F)
+  })
 
   selcCor <- reactive({
     input$slcR
@@ -95,6 +101,10 @@ server <- function(input, output, session) {
   
   output$treeAcc <- renderUI ({
     actionButton ('treeAcc', 'Reset table')
+  })
+  
+  output$applyMix <- renderUI ({
+    actionButton ('applyMix', 'Use mixing')
   })
 
   backframeDt <- eventReactive(input$applyCor, {
@@ -467,63 +477,6 @@ server <- function(input, output, session) {
     trg
   })
 
-
-
-  # treeX <- reactive ({
-  #   atatrib <- function(x) {
-  #     structure(x, stselected = TRUE)
-  #   }
-  #   trg <- trgdropList()
-  #   trg <- (list("bigtree" = (trg)))
-  # 
-  #   vL <- NULL
-  #   k <- 1
-  #   for (i in seq(1, length(trg$bigtree))) {
-  #     v <- paste("trg$bigtree$target", paste(i, "$", sep = ""), sep = "")
-  #     for (j in seq(1, length(trg$bigtree[[i]]))) {
-  #       vName <- paste(v, trg$bigtree[[i]][j], sep = "")
-  #       vName <- paste(vName, paste(" <- ", j, sep = ""), sep = "")
-  #       vL[k] <- vName
-  #       k <- k + 1
-  #     }
-  #   }
-  #   
-  #   for (i in seq(1, length(vL))) {
-  #     options(warn = -1)
-  #     eval(parse(text = vL[i]))
-  #     options(warn = 1)
-  #   }
-  # 
-  #   atatrib <- function(x) {
-  #     x[which(names(x) == "")] <- NULL
-  #     if (any(names(x) == "None")) {
-  #       structure(x, stselected = FALSE)
-  #     } else {
-  #       structure(x, stselected = TRUE)
-  #     }
-  #   }
-  # 
-  #   trg <- lapply(trg$bigtree, atatrib)
-  #   trg
-  # })
-
-  # output$tree <- renderTree ({
-  #   treeX ()
-  # })
-  
-  # d <- reactive ({
-  #   l <- names(unlist(get_selected(input$tree, format = c("slices"))))
-  #   d <- NULL
-  #   
-  #   if (!is.null(l)) {
-  #     for (i in seq(1, length(l))) {
-  #       d <- rbind(d, unlist(strsplit(l[i], "[.]")))
-  #     }
-  #     d <- d[-c(which(d[, 1] == d[, 2])), ]
-  #   }
-  #   d
-  # })
-  
   output$trg.drops <- renderDT(
     d (), selection = 'multiple'  
   )
@@ -546,7 +499,6 @@ server <- function(input, output, session) {
     req(outputCorrected())
     sourceList <- outputCorrected()[[1]]
     d <- data.frame(d())
-    #print (d)
     if (!is.null(input$trg.drops_rows_selected)){
       d <- d[-input$trg.drops_rows_selected,]
     }
@@ -590,48 +542,78 @@ server <- function(input, output, session) {
     dfaList_x()
   )
 
-  mixingOutput <- reactive({
+  mixingOutput <- eventReactive(input$applyMix, {
     req(dfaList_x())
-    dat <- outputCorrected()[[1]]
+    l <- outputCorrected()[[1]]
     DFA_l <- dfaList_x()
-    targets <- as.data.frame(TTout())
-    output <- NULL
-    datOutput <- NULL
-    for (j in seq(1:length(dat))) {
-      datas <- dat[[j]]
-      target <- as.data.frame(targets[j, ])
-      names(target) <- names(targets)
-      DFA <- as.data.frame(DFA_l[j, ])
-      names(DFA) <- names(DFA_l)
-      datas <- as.data.frame(datas)
-      rownames(datas) <- datas [, 1]
-      datas <- datas[, -1]
-      datas <- getSubsetmean(datas)
-      target <- target[, which(names(target) %in% colnames(datas))]
-      DFA <- DFA[(which(colnames(DFA) %in% colnames(datas)))]
-      DFA <- DFA[, colSums(DFA != 0) > 0]
-      target <- target[, which(names(target) %in% colnames(DFA))]
-      datas <- datas[, which(colnames(datas) %in% colnames(DFA))]
+    targetD <- as.data.frame(TTout())
+    finalDat <- NULL
+    
+    for (i in seq (1, length (l))){
+      target <- targetD[i,-c(1,2)]
+      DFA <- DFA_l[i,]
+      x <- l[[i]]
+      uniSource <- unique (x[,2])
+      split <- input$split
+      modelOutput <- NULL
+      print (paste0('Mixing source: ', i))
+      
+      for (j in seq (1,input$mcsimulations)){
+        inputTrain <- NULL
+        inputValidate <- NULL
+        for (i2 in seq (1, length (uniSource))){
+          dat <- x[which (x[,2] == uniSource[i2]),]
+          train_index <- sample(1:nrow(dat), nrow(dat) * split)
+          training_dat <- dat[train_index,]
+          validate_dat <- dat[-train_index,]
+          inputTrain <- rbind (inputTrain, training_dat)
+          inputValidate <- rbind (inputValidate, validate_dat)
+        }
+        datas <- getSubsetmean (inputTrain[,-1])
+        
+        DFA <- DFA[(which(colnames(DFA) %in% colnames(datas)))]
+        DFA <- DFA[, colSums(DFA != 0) > 0]
+        target <- target[, which(names(target) %in% colnames(DFA))]
+        datas <- datas[, which(colnames(datas) %in% colnames(DFA))]
+        
 
-      if (1 == 1) {
-        output <- UseUnMixing(target, datas, DFA, method = "Nelder-Mead")
-        rn <- rownames(output)
-        output <- output[order(rn), ]
-      } else {
-        result <- UseUnMixing(target, datas, DFA, method = "Nelder-Mead")
-        output <- rbind(output, result)
-        rn <- rownames(output)
-        output <- output[order(rn), ]
+        dat <- inputValidate [,-c(1,2)]
+        dat <- dat[,which(names(dat) %in% colnames (DFA))]
+        dat <- rbind (dat, target)
+        
+        if (any(dat == 0)) {dat[dat==0]<- 0.001}
+        
+        rownames (dat) <- c(as.character(inputValidate[,1]), as.character(targetD[i,1]))
+        #for (i3 in seq (1, nrow (dat))){
+          #output <- UseUnMixing(dat[i3,], datas, DFA, method = "Nelder-Mead")
+          #modelOutput <- rbind (modelOutput, output)
+        #}
+        
+        cl <- makeCluster(numCores)
+        
+        optimMix <- function (x) {
+          datas <- get ('datas', envir = environment())
+          DFA <- get ('DFA', envir = environment())
+          output <- UseUnMixing(x, datas, DFA, method = "Nelder-Mead")
+        }
+        clusterExport(cl, list ('UseUnMixing', 'datas', 'DFA', 'dat', 'optimMix'), envir=environment())
+        #print (paste0('Started model: ', j))
+        output <- t(parApply(cl, dat, 1, optimMix))
+        modelOutput <- rbind (modelOutput, output)
+        #print (paste0('Done model: ', j))
+        stopCluster(cl)
       }
-      datOutput <- rbind(datOutput, output)
+      finalDat <- rbind (finalDat, modelOutput)
     }
-    rownames(datOutput) <- seq(1, nrow(datOutput))
-    round(datOutput, 3)
+    round(finalDat, 3)
   })
 
+  
   output$mixingOutput <- renderDT({
     mixingOutput()
   })
+  
+  
 }
 
 # User interface side of the user input
@@ -1042,6 +1024,9 @@ ui <- dashboardPage(
           fluidRow(
             column(
               width = 12,
+              uiOutput ('applyMix'),
+              uiOutput ('split'),
+              numericInput("mcsimulations", "Monte carlo simulations:", 2, min = 1, max = 1000),
               withSpinner(DTOutput("mixingOutput")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
             )
           )
