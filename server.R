@@ -20,19 +20,19 @@ source("modules_navtab2.R")
 source("input_mod.R")
 library("shiny")
 library("DT")
-library (parallel)
-numCores <- detectCores()-1
+library(parallel)
+numCores <- detectCores() - 1
 # source ('correction_test.R')
 
 
 server <- function(input, output, session) {
   options(shiny.maxRequestSize = 70 * 1024^2) # Max csv data limit set to 60 mb
 
-  src.Data <- callModule(csvFile, "file1", stringsAsFactors = FALSE)
-  dats <- callModule(inputMod, "dat1", src.Data())
+  source_data <- callModule(csvFile, "file1", stringsAsFactors = FALSE)
+  dats <- callModule(inputMod, "dat1", source_data())
 
-  trg.Data <- callModule(csvFile, "file2")
-  trgs <- callModule(inputMod, "dat2", trg.Data())
+  target_data <- callModule(csvFile, "file2")
+  trgs <- callModule(inputMod, "dat2", target_data())
 
   output$DT <- renderDT({
     DTout()
@@ -86,9 +86,9 @@ server <- function(input, output, session) {
   output$corR <- renderUI({
     sliderInput("corR", "R", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = F)
   })
-  
-  output$split <- renderUI ({
-    sliderInput ('split', 'Split proportion', value = 0.9, min = 0.1, max = 0.99, step = 0.05, animate = F)
+
+  output$split <- renderUI({
+    sliderInput("split", "Split proportion", value = 0.9, min = 0.1, max = 0.99, step = 0.05, animate = F)
   })
 
   selcCor <- reactive({
@@ -96,26 +96,32 @@ server <- function(input, output, session) {
   })
 
   output$applyCor <- renderUI({
-    actionButton("applyCor", "Apply corrections")
+    actionButton("applyCor", "Apply")
   })
-  
-  output$treeAcc <- renderUI ({
-    actionButton ('treeAcc', 'Reset table')
+
+  output$treeAcc <- renderUI({
+    actionButton("treeAcc", "Reset table")
   })
-  
-  output$applyMix <- renderUI ({
-    actionButton ('applyMix', 'Use mixing')
+
+  output$applyMix <- renderUI({
+    actionButton("applyMix", "Use mixing")
   })
 
   backframeDt <- eventReactive(input$applyCor, {
-    datas <- DT_p2()
-    datas <- corect.func(as.data.frame(datas), input$corR, input$shapiroP, input$slcC, input$slcR)
-    datas <- datas[, -which(names(datas) %in% c("formula"))]
-    datas$id <- seq(1, nrow(datas))
-    if (!is.null(datas)) {
-      datas
-    } else {
+    # print("using function backframeDt")
+    # print(input$corBut)
+    if (input$corBut == "Cor") {
+      datas <- DT_p2()
+      datas <- corect.func(as.data.frame(datas), input$corR, input$shapiroP, input$slcC, input$slcR)
+      datas <- datas[, -which(names(datas) %in% c("formula"))]
+      datas$id <- seq(1, nrow(datas))
+      if (!is.null(datas)) {
+        datas
+      } else {
 
+      }
+    } else {
+      NULL
     }
   })
 
@@ -124,46 +130,59 @@ server <- function(input, output, session) {
   })
 
   output$convOptions <- renderDT({
-    datas <- convOptions()
-    colnames(datas)[5] <- "Formula"
-    datas[, 5] <- (gsub("I(datas$", replacement = "(", datas[, 5], fixed = T))
-    datas[, 5] <- (gsub("datas$", replacement = "", datas[, 5], fixed = T))
-    datas[, 5] <- (gsub("I", replacement = "", datas[, 5], fixed = T))
-    datas[, 5] <- (gsub("logI", replacement = "log", datas[, 5], fixed = T))
-    # datas$id <- seq (1, nrow(datas))
-    if (!is.null(datas)) {
-      datas
-    } else {
+    if (!is.null(convOptions())) {
+      datas <- convOptions()
+      colnames(datas)[5] <- "Formula"
+      datas[, 5] <- (gsub("I(datas$", replacement = "(", datas[, 5], fixed = T))
+      datas[, 5] <- (gsub("datas$", replacement = "", datas[, 5], fixed = T))
+      datas[, 5] <- (gsub("I", replacement = "", datas[, 5], fixed = T))
+      datas[, 5] <- (gsub("logI", replacement = "log", datas[, 5], fixed = T))
+      # datas$id <- seq (1, nrow(datas))
+      if (!is.null(datas)) {
+        datas
+      } else {
 
+      }
+    } else {
+      NULL
     }
   })
 
   fDt <- reactive({
-    dat <- convOptions()
-    valTable <- dat
-    varr <- valTable %>% group_by(source, element)
-    f <- varr %>% arrange(-desc(residualsSD), desc(Cooks), .by_group = TRUE)
-    f <- f %>%
-      group_by(source, element) %>%
-      mutate(rank = rank(-desc(residualsSD), ties.method = "first"))
-    f <- f[, -which(names(f) %in% c("formula", "grade", "Cooks", "residualsSD", "p-eq", "p-resi", "p.eq", "p.resi"))]
-    f <- as.data.frame(f)
-    f[, 3] <- (gsub("I(datas$", replacement = "(", f[, 3], fixed = T))
-    f[, 3] <- (gsub("datas$", replacement = "", f[, 3], fixed = T))
-    f[, 3] <- (gsub("I", replacement = "", f[, 3], fixed = T))
-    f[, 3] <- (gsub("logI", replacement = "log", f[, 3], fixed = T))
-    f[, 1] <- as.factor(f[, 1])
-    f[, 3] <- as.factor(f[, 3])
-    f <- f[!duplicated(f[, 3]), ]
-    return(f)
+    if (!is.null(convOptions())) {
+      dat <- convOptions()
+      valTable <- dat
+      varr <- valTable %>% group_by(source, element)
+      f <- varr %>% arrange(-desc(residualsSD), desc(Cooks), .by_group = TRUE)
+      f <- f %>%
+        group_by(source, element) %>%
+        mutate(rank = rank(-desc(residualsSD), ties.method = "first"))
+      f <- f[, -which(names(f) %in% c("formula", "grade", "Cooks", "residualsSD", "p-eq", "p-resi", "p.eq", "p.resi"))]
+      f <- as.data.frame(f)
+      f[, 3] <- (gsub("I(datas$", replacement = "(", f[, 3], fixed = T))
+      f[, 3] <- (gsub("datas$", replacement = "", f[, 3], fixed = T))
+      f[, 3] <- (gsub("I", replacement = "", f[, 3], fixed = T))
+      f[, 3] <- (gsub("logI", replacement = "log", f[, 3], fixed = T))
+      f[, 1] <- as.factor(f[, 1])
+      f[, 3] <- as.factor(f[, 3])
+      f <- f[!duplicated(f[, 3]), ]
+      return(f)
+    } else {
+      NULL
+    }
   })
 
   convFDt <- reactive({
-    dat1 <- convOptions()
-    dat2 <- finalDtrg()
-    dat <- dat1[which(dat1$id %in% dat2$id), ]
-    dat <- cbind(dat[, 1], 0, dat[, 2:ncol(dat)])
-    dat
+    if (!is.null(convOptions())) {
+      dat1 <- convOptions()
+      dat2 <- finalDtrg()
+      dat <- dat1[which(dat1$id %in% dat2$id), ]
+      dat <- cbind(dat[, 1], 0, dat[, 2:ncol(dat)])
+      dat
+    }
+    else {
+      NULL
+    }
   })
 
   output$convFDt <- renderDT({
@@ -171,59 +190,71 @@ server <- function(input, output, session) {
   })
 
   outputCorrected <- reactive({
-    req(DT_p2()) # source data
-    req(convFDt()) # formulas format
-    req(TTout()) # Target data
-    req(input$trgS)
+    if (input$corBut == "Cor") {
+      req(DT_p2()) # source data
+      req(convFDt()) # formulas format
+      req(TTout()) # Target data
+      req(input$trgS)
 
-    datas <- DT_p2()
-    datas <- datas[, which(!colnames(datas) %in% input$slcR)]
-    target <- as.data.frame(TTout())
-    target <- target[, which(!colnames(target) %in% input$slcR)]
-    y <- as.data.frame(convFDt())
-    x <- as.data.frame(datas)
-    output <- list()
-    slopes <- list()
-    drops <- list()
+      datas <- DT_p2()
+      datas <- datas[, which(!colnames(datas) %in% input$slcR)]
+      target <- as.data.frame(TTout())
+      target <- target[, which(!colnames(target) %in% input$slcR)]
+      y <- as.data.frame(convFDt())
+      x <- as.data.frame(datas)
+      output <- list()
+      slopes <- list()
+      drops <- list()
 
-    for (i in seq(1, dim(target)[1])) {
-      dat <- correct(x, target[i, ], y, input$slcC)
-      output[[i]] <- dat[[1]]
-      slopes[[i]] <- dat[[2]]
-      if (length(dat[[3]]) > 0) {
-        drops [[i]] <- dat[[3]]
-      } else {
-        drops[[i]] <- NA
+      for (i in seq(1, dim(target)[1])) {
+        dat <- correct(x, target[i, ], y, input$slcC)
+        output[[i]] <- dat[[1]]
+        slopes[[i]] <- dat[[2]]
+        if (length(dat[[3]]) > 0) {
+          drops [[i]] <- dat[[3]]
+        } else {
+          drops[[i]] <- NA
+        }
       }
-    }
 
 
-    y <- slopes
-    slopes.DT <- data.frame(matrix(NA, nrow = 8, ncol = 3))
+      y <- slopes
+      slopes.DT <- data.frame(matrix(NA, nrow = 8, ncol = 3))
 
-    for (i in seq(1, length(y[[1]]))) {
-      if (length(y[[1]][[i]]) < 2) {
-        y[[1]][[i]] <- c(y[[1]][[i]], NA)
-        y[[1]][[i]] <- c(y[[1]][[i]], NA)
-      } else if (length(y[[1]][[i]]) < 3) {
-        y[[1]][[i]] <- c(y[[1]][[i]], NA)
+      for (i in seq(1, length(y[[1]]))) {
+        if (length(y[[1]][[i]]) < 2) {
+          y[[1]][[i]] <- c(y[[1]][[i]], NA)
+          y[[1]][[i]] <- c(y[[1]][[i]], NA)
+        } else if (length(y[[1]][[i]]) < 3) {
+          y[[1]][[i]] <- c(y[[1]][[i]], NA)
+        }
+        slopes.DT[i, ] <- y[[1]][[i]]
       }
-      slopes.DT[i, ] <- y[[1]][[i]]
+
+      colnames(slopes.DT) <- c("var1", "var2", "var1*var2")
+
+      cleanT <- function(x) {
+        x <- (gsub("I(datas$", replacement = "(", x, fixed = T))
+        x <- (gsub("datas$", replacement = "", x, fixed = T))
+        x <- (gsub("I", replacement = "", x, fixed = T))
+        x <- (gsub("logI", replacement = "log", x, fixed = T))
+      }
+      drops <- lapply(drops, cleanT)
+
+      drops <- plyr::ldply(drops, rbind)
+
+      list(output, slopes.DT, drops)
+    } else {
+      req(DT_p2())
+      req(TTout())
+      output <- list()
+      for (i in seq(1, nrow(TTout()))) {
+        datas <- DT_p2()
+        output [[i]] <- datas
+      }
+      print("function outputcorrected")
+      list(output, NULL, NULL)
     }
-
-    colnames(slopes.DT) <- c("var1", "var2", "var1*var2")
-
-    cleanT <- function(x) {
-      x <- (gsub("I(datas$", replacement = "(", x, fixed = T))
-      x <- (gsub("datas$", replacement = "", x, fixed = T))
-      x <- (gsub("I", replacement = "", x, fixed = T))
-      x <- (gsub("logI", replacement = "log", x, fixed = T))
-    }
-    drops <- lapply(drops, cleanT)
-
-    drops <- plyr::ldply(drops, rbind)
-
-    list(output, slopes.DT, drops)
   })
 
   output$trgS <- renderUI({
@@ -231,7 +262,7 @@ server <- function(input, output, session) {
   })
 
   tabList <- reactive({
-    req (outputCorrected())
+    req(outputCorrected())
     outputCorrected() [[1]][[as.numeric(input$trgS)]]
   })
 
@@ -253,7 +284,9 @@ server <- function(input, output, session) {
       datatable(dat, filter = "top", options = list(
         pageLength = 5, autoWidth = F
       ))
-    } else {}
+    } else {
+      NULL
+    }
   })
 
   selectPick <- reactive({
@@ -450,7 +483,7 @@ server <- function(input, output, session) {
     req(tarBrackets())
     dat <- tarBrackets()
     selection <- dat[[2]]
-    #trgDat <<- dat
+    # trgDat <<- dat
 
     DT::datatable(dat[[1]]) %>% formatStyle(
       c(colnames(dat[[1]])),
@@ -459,7 +492,7 @@ server <- function(input, output, session) {
   })
 
   trgdropList <- reactive({
-    req (tarBrackets())
+    req(tarBrackets())
     dat <- tarBrackets()
     x <- dat[[1]]
     trg <- list()
@@ -478,18 +511,19 @@ server <- function(input, output, session) {
   })
 
   output$trg.drops <- renderDT(
-    d (), selection = 'multiple'  
+    d(),
+    selection = "multiple"
   )
-  
-  d <- reactive ({
-    req (trgdropList())
+
+  d <- reactive({
+    req(trgdropList())
     trg <- trgdropList()
     dat <- NULL
-    for (i in seq (1, length (trg))){
-      tname <- names (trg)[i]
-      for (j in seq (1, length (trg[i]))) {
+    for (i in seq(1, length(trg))) {
+      tname <- names(trg)[i]
+      for (j in seq(1, length(trg[i]))) {
         val <- trg[i][[j]]
-        dat <- rbind (dat, cbind(tname,val)) 
+        dat <- rbind(dat, cbind(tname, val))
       }
     }
     dat
@@ -499,8 +533,8 @@ server <- function(input, output, session) {
     req(outputCorrected())
     sourceList <- outputCorrected()[[1]]
     d <- data.frame(d())
-    if (!is.null(input$trg.drops_rows_selected)){
-      d <- d[-input$trg.drops_rows_selected,]
+    if (!is.null(input$trg.drops_rows_selected)) {
+      d <- d[-input$trg.drops_rows_selected, ]
     }
     d[, 1] <- as.character(d[, 1])
     d[, 2] <- as.character(d[, 2])
@@ -519,7 +553,7 @@ server <- function(input, output, session) {
   })
 
 
-  dfaList_x <- reactive({
+  dfaList_x <- eventReactive(input$applyDFA, {
     req(dfaReactive())
     req(TTout())
     datas <- dfaReactive()
@@ -539,90 +573,184 @@ server <- function(input, output, session) {
   })
 
   output$dfaList <- renderDT(
-    dfaList_x()
+    if (input$rbDFA == "def") {
+      dfaList_x()
+    } else {
+      dat <- TTout()
+      d <- dim(dat)
+      dat_output <- data.frame(matrix(100, nrow = d[1], ncol = (d[2] - 2)))
+      colnames(dat_output) <- names(dat)[-c(1, 2)]
+      dat_output <- dat_output[, -c(which(colnames(dat_output) %in% d()[, 2]))]
+      rownames(dat_output) <- NULL
+      dat_output
+    }
   )
 
   mixingOutput <- eventReactive(input$applyMix, {
     req(dfaList_x())
+    req(input$rbMix)
     l <- outputCorrected()[[1]]
     DFA_l <- dfaList_x()
     targetD <- as.data.frame(TTout())
     finalDat <- NULL
-    
-    for (i in seq (1, length (l))){
-      target <- targetD[i,-c(1,2)]
-      DFA <- DFA_l[i,]
+
+    if (input$rbMix == "all") {
+
+    } else {
+      l <- l[which(TTout()[, 1] %in% input$selected_targets)]
+      targetD <- targetD[which(targetD[, 1] %in% input$selected_targets), ]
+      DFA_l <- DFA_l[which(targetD[, 1] %in% input$selected_targets), ]
+    }
+
+    for (i in seq(1, length(l))) {
+      target <- targetD[i, -c(1, 2)]
+      DFA <- DFA_l[i, ]
       x <- l[[i]]
-      uniSource <- unique (x[,2])
-      uniSource <- as.character (uniSource)
+      uniSource <- unique(x[, 2])
+      uniSource <- as.character(uniSource)
       split <- input$split
       modelOutput <- NULL
-      print (paste0('Mixing source: ', i))
-      
-      for (j in seq (1,input$mcsimulations)){
+      print(paste0("Mixing source: ", i))
+
+      for (j in seq(1, input$mcsimulations)) {
         inputTrain <- NULL
         inputValidate <- NULL
-        for (i2 in seq (1, length (uniSource))){
-          dat <- x[which (x[,2] == uniSource[i2]),]
+        for (i2 in seq(1, length(uniSource))) {
+          dat <- x[which(x[, 2] == uniSource[i2]), ]
           train_index <- sample(1:nrow(dat), nrow(dat) * split)
-          training_dat <- dat[train_index,]
-          validate_dat <- dat[-train_index,]
-          inputTrain <- rbind (inputTrain, training_dat)
-          inputValidate <- rbind (inputValidate, validate_dat)
+          training_dat <- dat[train_index, ]
+          validate_dat <- dat[-train_index, ]
+          inputTrain <- rbind(inputTrain, training_dat)
+          inputValidate <- rbind(inputValidate, validate_dat)
         }
-        datas <- getSubsetmean (inputTrain[,-1])
-        
+        datas <- getSubsetmean(inputTrain[, -1])
+
         DFA <- DFA[(which(colnames(DFA) %in% colnames(datas)))]
         DFA <- DFA[, colSums(DFA != 0) > 0]
         target <- target[, which(names(target) %in% colnames(DFA))]
         datas <- datas[, which(colnames(datas) %in% colnames(DFA))]
-        
 
-        dat <- inputValidate [,-c(1,2)]
-        dat <- dat[,which(names(dat) %in% colnames (DFA))]
-        dat <- rbind (dat, target)
-        
-        if (any(dat == 0)) {dat[dat==0]<- 0.001}
-        
-        rownames (dat) <- c(as.character(inputValidate[,1]), as.character(targetD[i,1]))
-        #for (i3 in seq (1, nrow (dat))){
-          #output <- UseUnMixing(dat[i3,], datas, DFA, method = "Nelder-Mead")
-          #modelOutput <- rbind (modelOutput, output)
-        #}
-        
+
+        dat <- inputValidate [, -c(1, 2)]
+        dat <- dat[, which(names(dat) %in% colnames(DFA))]
+        dat <- rbind(dat, target)
+
+        if (any(dat == 0)) {
+          dat[dat == 0] <- 0.001
+        }
+
+        rownames(dat) <- c(as.character(inputValidate[, 1]), as.character(targetD[i, 1]))
+        # for (i3 in seq (1, nrow (dat))){
+        # output <- UseUnMixing(dat[i3,], datas, DFA, method = "Nelder-Mead")
+        # modelOutput <- rbind (modelOutput, output)
+        # }
+
         cl <- makeCluster(numCores)
-        
-        optimMix <- function (x) {
-          datas <- get ('datas', envir = environment())
-          DFA <- get ('DFA', envir = environment())
+
+        optimMix <- function(x) {
+          datas <- get("datas", envir = environment())
+          DFA <- get("DFA", envir = environment())
           output <- UseUnMixing(x, datas, DFA, method = "Nelder-Mead")
         }
-        clusterExport(cl, list ('UseUnMixing', 'datas', 'DFA', 'dat', 'optimMix'), envir=environment())
+        clusterExport(cl, list("UseUnMixing", "datas", "DFA", "dat", "optimMix"), envir = environment())
         output <- t(parApply(cl, dat, 1, optimMix))
-        output <- cbind (output,  j)
-        modelOutput <- rbind (modelOutput, output)
+        output <- cbind(output, j)
+        modelOutput <- rbind(modelOutput, output)
         stopCluster(cl)
       }
-      modelOutput <- cbind (modelOutput, i)
-      
-      finalDat <- rbind (finalDat, modelOutput)
-      finalDat <- round (finalDat, 3)
+      modelOutput <- cbind(modelOutput, i)
+
+      finalDat <- rbind(finalDat, modelOutput)
+      finalDat <- round(finalDat, 3)
     }
-    x <- as.data.frame (finalDat)
-    x[,(ncol(x)-1)] <- paste0('Monte Carlo: ', x[,(ncol(x)-1)])
-    x[,(ncol(x))] <- paste0('Target: ', x[,(ncol(x))])
-    colnames (x) <- c(uniSource, 'GOF', 'Monte-Carlo','Target')
+    x <- as.data.frame(finalDat)
+    x[, (ncol(x) - 1)] <- paste0("Monte Carlo: ", x[, (ncol(x) - 1)])
+    x[, (ncol(x))] <- paste0("Target: ", x[, (ncol(x))])
+    colnames(x) <- c(uniSource, "GOF", "Monte-Carlo", "Target")
     x
   })
 
-  
+
   output$mixingOutput <- renderDT({
     x <- as.data.frame(mixingOutput())
-    dat <<-x
     x
   })
 
+  output$targetPlot <- renderUI({
+    req(mixingOutput())
+    dat <- as.data.frame(mixingOutput())
+    # print (dat)
+    datGloba_plot <<- dat
+    dat <- dat[grep("target", rownames(dat)), ]
+
+    un <- rownames(dat[which(rownames(dat) %in% as.character(TTout()[, 1])), ])
+
+    if (!is.null(input$selected_targets)) {
+      dat <- dat[which(rownames(dat) %in% input$selected_targets), ]
+    }
+    # selectInput('targetPlot', 'Select target', unique(dat[,ncol(dat)]), selected = NULL)
+    selectInput("targetPlot", "Select target", un, selected = NULL)
+  })
+
+  output$viPlot <- renderPlot({
+    req(mixingOutput())
+    dat <- as.data.frame(mixingOutput())
+    dat <- dat[grep("target", rownames(dat)), ]
+    targNames <- rownames(dat)
+
+    # targGlobal <<- targNames
+    targetSelected <- dat$Target[which(rownames(dat) %in% input$targetPlot)]
+    # input$targetPlot
+
+    dat <- melt(dat)
+    # datmeltGlobal <<- dat
+    tryCatch({
+      # dat <- dat[which (dat[,2] == input$targetPlot),]
+      dat <- dat[which(dat[, 2] == targetSelected), ]
+      ggplot(dat, aes(factor(variable), value, colour = variable)) +
+        geom_violin(trim = FALSE) + geom_jitter(height = 0, width = 0.1) + geom_boxplot(width = 0.1, color = "black", alpha = 0.5) +
+        facet_wrap(~variable, ncol = 2, scales = "free")
+    }, warning = function(cond) {}, error = function(cond) {})
+  }, height = 400, width = 600)
+
+  output$radioBut <- renderUI({
+    radioButtons("rbMix", "Select mixing", choices = c("all", "subset"), selected = "all")
+  })
+
+  output$selectTarget <- renderUI({
+    req(input$rbMix)
+    # print (TTout())
+    if (input$rbMix == "all") { } else {
+      checkboxGroupInput("selected_targets", "Targets",
+        choices = unique(as.character(TTout()[, 1])), selected = unique(as.character(TTout()[, 1])), inline = FALSE,
+        width = NULL
+      )
+    }
+  })
+
+  output$corBut <- renderUI({
+    radioButtons(
+      "corBut", "Correct for any of the elements? :",
+      c(
+        "Correct" = "Cor",
+        "No" = "noCor"
+      ),
+      selected = "Cor"
+    )
+  })
+
+  output$rbDFA <- renderUI({
+    radioButtons(
+      "rbDFA", "Apply DFA, default or uniform weights? :",
+      c(
+        "default" = "def",
+        "uniform" = "uni"
+      ),
+      selected = "def"
+    )
+  })
 }
+
 
 # User interface side of the user input
 ui <- dashboardPage(
@@ -915,6 +1043,7 @@ ui <- dashboardPage(
             "Corrections",
             sidebarLayout(
               sidebarPanel(
+                uiOutput("corBut"),
                 uiOutput("selcCor"), # ,
                 uiOutput("selcRem"),
                 uiOutput("shapiroP"),
@@ -998,7 +1127,8 @@ ui <- dashboardPage(
               uiOutput("brack_range"),
               sidebarLayout(
                 sidebarPanel(
-                  DTOutput("trg.drops"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  DTOutput("trg.drops"),
+                  style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                   # shinyTree("tree",
                   #   checkbox = TRUE, search = TRUE, theme = "proton", themeIcons = F,
                   #   themeDots = F
@@ -1010,8 +1140,8 @@ ui <- dashboardPage(
                   style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 )
               )
-            )#,
-            #DTOutput("trg.drops")
+            ) # ,
+            # DTOutput("trg.drops")
           )
         )
       ),
@@ -1019,9 +1149,17 @@ ui <- dashboardPage(
         tabName = "DFA",
         fluidPage(
           fluidRow(
-            column(
-              width = 12,
-              withSpinner(DTOutput("dfaList")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+            sidebarLayout(
+              sidebarPanel(
+                uiOutput("rbDFA"),
+                actionButton("applyDFA", "Apply")
+              ),
+              mainPanel(
+                column(
+                  width = 12,
+                  withSpinner(DTOutput("dfaList")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+                )
+              )
             )
           )
         )
@@ -1030,12 +1168,22 @@ ui <- dashboardPage(
         tabName = "mixmod",
         fluidPage(
           fluidRow(
-            column(
-              width = 12,
-              uiOutput ('applyMix'),
-              uiOutput ('split'),
-              numericInput("mcsimulations", "Monte carlo simulations:", 2, min = 1, max = 1000),
-              withSpinner(DTOutput("mixingOutput")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+            sidebarLayout(
+              sidebarPanel(
+                uiOutput("applyMix"),
+                uiOutput("split"),
+                uiOutput("radioBut"),
+                uiOutput("selectTarget"),
+                numericInput("mcsimulations", "Monte carlo simulations:", 2, min = 1, max = 1000)
+              ),
+              mainPanel(
+                column(
+                  width = 12,
+                  withSpinner(DTOutput("mixingOutput")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;",
+                  uiOutput("targetPlot"),
+                  plotOutput("viPlot", width = "100%")
+                )
+              )
             )
           )
         )
