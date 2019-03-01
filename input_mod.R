@@ -1,18 +1,19 @@
 library(shiny)
 library(DT)
-
-# Module UI function
+library (plotly)
+library (ggplot2)
+# # Module UI function
 csvFileInput <- function(id, label = "CSV file") {
   # Create a namespace function using the provided id
   ns <- NS(id)
   tagList(
     fileInput(ns("file"), label,
-              multiple = F,
-              accept = c(
-                "text/csv",
-                "text/comma-separated-values,text/plain",
-                ".csv"
-              )
+      multiple = F,
+      accept = c(
+        "text/csv",
+        "text/comma-separated-values,text/plain",
+        ".csv"
+      )
     )
   )
 }
@@ -22,10 +23,9 @@ csvFileInput <- function(id, label = "CSV file") {
 csvFile <- function(input, output, session, stringsAsFactors) {
   # The selected file, if any
   userFile <- reactive({
-    #cat ('usr inp')
+    # cat ('usr inp')
     # If no file is selected, don't do anything
     validate(need(input$file, message = FALSE))
-
     input$file
   })
   # The user's data, parsed into a data frame
@@ -39,7 +39,9 @@ csvFile <- function(input, output, session, stringsAsFactors) {
   # We can run observers in here if we want to
   observe({
     msg <- sprintf("File %s was uploaded", userFile()$name)
+    cat(msg, "\n")
   })
+
   # Return the reactive that yields the data frame
   return(dataframe)
 }
@@ -49,17 +51,22 @@ csvFile <- function(input, output, session, stringsAsFactors) {
 # Module UI function
 columnChooserUI <- function(id) {
   ns <- NS(id)
-  print (ns('before error'))
-  uiOutput(ns("columnChooserUI"))
+  uiOutput(ns("controls"))
 }
 
-
-DT_tab <- function(id) {
-  ns <- NS(id)
-  withSpinner(DTOutput(ns("DT_tab")))
+columnChooser <- function(input, output, session, ImProxy) {
+  output$controls <- renderUI({
+    ns <- session$ns
+    print ('column names')
+    checkboxGroupInput(ns("col"), "Columns", names(ImProxy()), selected = names(ImProxy()))
+  })
+  return(reactive({
+    validate(need(input$col, FALSE))
+    ImProxy()[, input$col]
+  }))
 }
 
-
+# adjustable correlation matrix parameters
 mat_par <- function(id) {
   ns <- NS(id)
   tagList(
@@ -70,115 +77,88 @@ mat_par <- function(id) {
   )
 }
 
-
-srcCor <- function(id) { #simple corrplot
+srcCor <- function(id) { # simple corrplot
   ns <- NS(id)
-  withSpinner(plotOutput(ns("srcCor")))
+  withSpinner(plotOutput(ns("srcCor"), width = "100%", height = "600px"))
 }
 
 
-srcDCor <- function(id) { #correlation plot with scatterplots
+srcDCor <- function(id) { # correlation plot with scatterplots
   ns <- NS(id)
   withSpinner(plotOutput(ns("srcDCor"), height = "1000px"))
 }
 
 
 # Module server function
-inputMod <- function(input, output, session, data) {
-  
+inputMod <- function(input, output, session, ImProxy) {
   output$corR <- renderUI({
     ns <- session$ns
-    req (data)
-    sliderInput(ns("corR"), "R2", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = T)
+    req(ImProxy())
+    sliderInput(ns("corR"), "R", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = T)
   })
-  
+
   output$corMethod <- renderUI({
     ns <- session$ns
-    req (data)
+    req(ImProxy())
     selectInput(ns("corMethod"), "Method", c(
       "pie", "circle", "square", "ellipse", "number", "shade",
       "color"
     ))
   })
-  
+
   output$corType <- renderUI({
     ns <- session$ns
-    req (data)
-    selectInput(ns("corType"), "Type", c( "lower","full", "upper"))
+    req(ImProxy())
+    selectInput(ns("corType"), "Type", c("full","lower", "upper"))
   })
-  
+
   output$tl.cex <- renderUI({
     ns <- session$ns
-    req (data)
+    req(ImProxy())
     sliderInput(ns("tl.cex"), "FontSize", value = 1, min = 0.1, max = 1.5, step = 0.1)
   })
-  
 
-  clmns <- reactive({
-    ns <- session$ns
-    req (data)
-    checkboxGroupInput(ns("col"), "Remove: ", names(data), selected = names(data))
-  })
-  
-  # select columns for correlation plot
-  output$columnChooserUI <- renderUI({
-    clmns()
-  })
-  
-  #cat ('running module')
+
+  # cat ('running module')
   DT_tab <- reactive({
-    req (input$col)
-    if (length(input$col)<1){
-      data
+    req(input$col)
+    if (length(input$col) < 1) {
+      ImProxy()
     } else {
-      data[, input$col]
+      ImProxy()[, input$col]
     }
   })
-  
-  # table output
-  output$DT_tab <- renderDT({
-    req(data)
-    DT_tab ()
-  })
-  
+
+
   # Correlationp plot
   output$srcCor <- renderPlot({
-    req(data)
-    req (input$corR)
-    dat <- na.omit(data)
-    
+    req(ImProxy())
+    req(input$corR)
+    dat <- na.omit(ImProxy())
+    M <- cor(dat[, input$col[-c(1, 2)]])
+    M[M < input$corR & M > -input$corR] <- 0
+    p <- corrplot(M, method = input$corMethod, order = "hclust", input$corType, tl.cex = input$tl.cex, diag = FALSE)
+    #p <- ggplotly(p)
+  })
 
-      M <- cor(dat[, input$col[-c(1,2)]])
-      M[M < input$corR & M > -input$corR] <- 0
-      corrplot(M, method = input$corMethod, order = "hclust", input$corType, tl.cex = input$tl.cex, diag = FALSE)
-    
-  }, height = "auto")
-  
   # corrplot of src with distributions
   output$srcDCor <- renderPlot({
-    req(data)
+    req(ImProxy())
     if (length(input$col) < 2) {
     } else {
-      dat <- na.omit(data)
+      dat <- na.omit(ImProxy())
       dat <- dat[, input$col]
       pairs.panels(dat,
-                   method = "pearson", # correlation method
-                   hist.col = "#00AFBB",
-                   density = TRUE, # show density plots
-                   ellipses = TRUE # show correlation ellipses
+        method = "pearson", # correlation method
+        hist.col = "#00AFBB",
+        density = TRUE, # show density plots
+        ellipses = TRUE # show correlation ellipses
       )
     }
   })
-  
-  return (DT_tab)
+
+  return(DT_tab)
 }
-
-
-
-
-
-
-
 
 
 # data frame of shapiro-wilk test p-values
@@ -215,12 +195,12 @@ spPlotpick <- function(id) {
 
 getspQQval <- function(id) {
   ns <- NS(id)
-  plotOutput(ns("getspQQval"))
+  plotlyOutput(ns("getspQQval"))
 }
 
 getorigQQval <- function(id) {
   ns <- NS(id)
-  plotOutput(ns("getorigQQval"))
+  plotlyOutput(ns("getorigQQval"))
 }
 
 # number of standard diviates from normal
@@ -258,28 +238,23 @@ outliersADtab3 <- function(id) {
 outliersADtab4 <- function(id) {
   ns <- NS(id)
   DTOutput(ns("outliersADtab4"))
-} 
+}
+
+
 # Module server function
 checkD <- function(input, output, session, datas) {
-
-  options (warn = -1)
+  options(warn = -1)
   ns <- session$ns
-  
-  #read in data input 
-  DT_tab <- reactive ({
-    datas ()
-    
-  })
 
   # compute shapiro wilk test p value  & output it as data frame
   compSP <- reactive({
-    datas <- rawShapiro(DT_tab())
+    datas <- rawShapiro(datas())
   })
 
   # output as data frame shapiro wilk table
   output$srcSP <- renderDT({
     # req (DT_tab())
-    req(is.factor(DT_tab()[, 2]))
+    req(is.factor(datas()[, 2]))
     datas <- compSP()
 
     if (!is.null(input$shapiroP)) {
@@ -301,10 +276,10 @@ checkD <- function(input, output, session, datas) {
 
   # get best transformation methods applied to normalize data
   getspMethods <- reactive({
-    req(DT_tab())
+    req(datas())
     req(compSP())
     req(input$col)
-    datas <- DT_tab()
+    datas <- datas()
 
     if (!is.null(input$shapiroP)) {
       cut <- input$shapiroP
@@ -312,12 +287,12 @@ checkD <- function(input, output, session, datas) {
       cut <- 0.05
     }
 
-    res <- transform(DT_tab(), compSP(), cut)[[2]]
+    res <- transform(datas(), compSP(), cut)[[2]]
   })
 
   # output data frame of best methods applied to normalize each class
   output$getspMethods <- renderDT({
-    req(is.factor(DT_tab()[, 2]))
+    req(is.factor(datas()[, 2]))
     DT::datatable(getspMethods()) %>% formatStyle(
       c(colnames(getspMethods())),
       backgroundColor = styleEqual("None", "lightblue"), fontWeight = "bold"
@@ -326,11 +301,11 @@ checkD <- function(input, output, session, datas) {
 
   # get p values of methods applied after shapiro wilk normalization test
   getspPval <- reactive({
-    req(DT_tab())
+    req(datas())
     req(compSP())
     req(input$col)
 
-    datas <- DT_tab()
+    datas <- datas()
 
     if (!is.null(input$shapiroP)) {
       cut <- input$shapiroP
@@ -343,7 +318,7 @@ checkD <- function(input, output, session, datas) {
 
   # output data frame of best methods applied to normalize each class
   output$getspPval <- renderDT({
-    req(is.factor(DT_tab()[, 2]))
+    req(is.factor(datas()[, 2]))
     if (!is.null(input$shapiroP)) {
       cut <- input$shapiroP
     } else {
@@ -357,26 +332,25 @@ checkD <- function(input, output, session, datas) {
 
   # ui to pick column name for qqplots
   output$spPlotpick <- renderUI({
-    req(DT_tab())
+    req(datas())
     req(input$col)
     ns <- session$ns
-    selectInput(ns("spPlotpick"), label = "Select Element", choices = colnames(DT_tab())[-c(1, 2)])
+    selectInput(ns("spPlotpick"), label = "Select Element to plot", choices = colnames(datas())[-c(1, 2)])
   })
 
   # get shapiro-wilk test applied methods
   getspQQval <- reactive({
-    req(DT_tab())
+    req(datas())
     req(compSP())
     req(input$col)
 
-    datas <- DT_tab()
+    datas <- datas()
 
     if (!is.null(input$shapiroP)) {
       cut <- input$shapiroP
     } else {
       cut <- 0.05
     }
-
     res <- transform(datas, compSP(), cut)
     y <- res[[4]]
     z <- res[[3]]
@@ -384,36 +358,66 @@ checkD <- function(input, output, session, datas) {
   })
 
   # plotOutput of shapiro wilk transformations, before and after
-  output$getspQQval <- renderPlot({
-    req(is.factor(DT_tab()[, 2]))
-
+  output$getspQQval <- renderPlotly({
+    req(is.factor(datas()[, 2]))
+    methods_dataframe <- data.frame(getspMethods ())
+    #print (getspMethods())
     req(getspQQval())
+    req (input$spPlotpick)
     datas <- getspQQval()
-    tryCatch({
+    #tryCatch({
       dat <- datas
       dat <- dat[order(dat[, 2]), ]
       suppressMessages(attach(dat))
       suppressWarnings(assign("val", get(input$spPlotpick)))
       colnames(dat)[2] <- "Classes"
-      ggplot(dat, aes(sample = val, colour = Classes)) +
-        stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
-        stat_qq_line()
-    }, warning = function(cond) {}, error = function(cond) {})
+      plot_annot <- data.frame (as.character(rownames(methods_dataframe)),as.character(methods_dataframe[input$spPlotpick]))
+      uniSource <- unique(as.character (rownames(methods_dataframe)))
+      #uniAnnot <- as.character(methods_dataframe[input$spPlotpick])
+      
+      uniAnnot <- (as.character(methods_dataframe[input$spPlotpick][,1]))
+      colnames(plot_annot) <- NULL
+      plot_dataframe <- cbind(dat[input$spPlotpick], dat$Classes)
+      plot_dataframe$annot <- 0
+      
+      for (i in seq (1,length(uniSource))){
+        ind <- which(as.character(plot_dataframe[,2]) == as.character(uniSource[i]))
+        plot_dataframe$annot[ind] <- uniAnnot[[i]]
+      }
+      colnames(plot_dataframe) <- c(input$spPlotpick, 'Classes', 'Label')
+      plot_dataframe[,2] <- paste(plot_dataframe[,2],plot_dataframe[,3], sep = ": ")
+      #print (head(plot_dataframe))
+      
+      print(
+        ggplotly(
+          ggplot(plot_dataframe, aes(sample = val, colour = Classes)) +
+            stat_qq() + #geom_text(aes(label = Label), vjust = -1)+
+            facet_wrap(~Classes, ncol = 2, scales = "free") +
+            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))
+        )
+      )
+    #}, warning = function(cond) {}, error = function(cond) {})
   })
 
-  output$getorigQQval <- renderPlot({
-    req(is.factor(DT_tab()[, 2]))
+  output$getorigQQval <- renderPlotly({
+    req(is.factor(datas()[, 2]))
+    req (input$spPlotpick)
 
-    tryCatch({
-      dat <- DT_tab()
+    #tryCatch({
+      dat <- datas()
       dat <- dat[order(dat[, 2]), ]
       suppressMessages(attach(dat))
       suppressWarnings(assign("val", get(input$spPlotpick)))
       colnames(dat)[2] <- "Classes"
-      ggplot(dat, aes(sample = val, colour = Classes)) +
-        stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
-        stat_qq_line()
-    }, warning = function(cond) {}, error = function(cond) {})
+      print(
+        ggplotly(
+          ggplot(dat, aes(sample = val, colour = Classes)) +
+            stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
+            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))
+        )
+      )
+      
+    #}, warning = function(cond) {}, error = function(cond) {})
   })
 
   # renderUI number of standard diviates to be considered as an outlier
@@ -425,7 +429,7 @@ checkD <- function(input, output, session, datas) {
   # showOutliers reactive function output
   # Output transformed data and values with with adjusent asterix if outlier, without order
   shwOutliers <- reactive({
-    dat <- DT_tab()
+    dat <- datas()
 
     if (!is.null(input$nStd)) {
       cut <- input$nStd
@@ -444,14 +448,14 @@ checkD <- function(input, output, session, datas) {
   # Output original data and index of outliers, without order
   matchOutliers <- reactive({
     x <- shwOutliers()
-    y <- DT_tab()
+    y <- datas()
     output <- x[[1]]
     outliers <- rep("0", dim(output)[1])
     output <- cbind(output, outliers)
     vals <- x[[2]]
-    options (warn = -1)
+    options(warn = -1)
     findRows <- unique((which(is.na(apply(as.data.frame(output[, 3:dim(output)[2]]), 2, as.numeric)), arr.ind = T)[, 1]))
-    options (warn = 1)
+    options(warn = 1)
     output[, ncol(output)][findRows] <- "1"
     output <- as.data.frame(output)
     output <- cbind(y, output$outliers[match(y[, 1], output[, 1])])
@@ -618,16 +622,14 @@ checkD <- function(input, output, session, datas) {
 
   # outliers advanced, tab 4 Output (final result)
   outliersADtab4 <- reactive({
-    datas <- DT_tab()
+    datas <- datas()
     datas[which(!datas[, 1] %in% outliersADtab3()[, 1]), ]
   })
 
   output$outliersADtab4 <- renderDT({
     outliersADtab4()
   })
-  
-  options (warn = 1)
-  return (outliersADtab4)
+
+  options(warn = 1)
+  return(outliersADtab4)
 }
-
-

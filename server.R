@@ -1,4 +1,5 @@
 
+
 #* ------------------------------------------------- Outliers Removal -----
 #  |  Function: Type ShinyDashboard
 #
@@ -14,105 +15,93 @@ source("pcg.R")
 source("func.R")
 source("Regressions.R")
 source("function_cor.R")
-source("modules_navtab1.R")
+#source("modules_navtab1.R")
 source("modules_navtab2.R")
-# source ('correction_test.R')
 source("input_mod.R")
 library("shiny")
 library("DT")
 library(parallel)
 numCores <- detectCores() - 1
-# source ('correction_test.R')
 
 
 server <- function(input, output, session) {
   options(shiny.maxRequestSize = 70 * 1024^2) # Max csv data limit set to 60 mb
 
-  source_data <- callModule(csvFile, "file1", stringsAsFactors = FALSE)
-  dats <- callModule(inputMod, "dat1", source_data())
-
+  source_data <- callModule(csvFile, "file1")
+  
+  source_columns <- callModule (columnChooser, 'dat1', source_data)
+  
+  output$source_origin <- renderDT ({
+    source_columns()
+  })
+  
+  #function for plots
+  source_module <- callModule(inputMod, "dat1", source_columns)
+  
   target_data <- callModule(csvFile, "file2")
-  trgs <- callModule(inputMod, "dat2", target_data())
+  
+  target_columns <- callModule (columnChooser, 'dat2', target_data)
+  
+  output$trgs_origin <- renderDT({
+    target_columns()
+  })
+  
+  trgs_module <- callModule(inputMod, "dat2", target_columns)
 
-  output$DT <- renderDT({
-    DTout()
+  output$trgs_origin_mdl <- renderDT({
+    target_function()
   })
 
-  DTout <- reactive({
-    dats()
+  target_function <- reactive({
+    trgs_module()[, which(names(trgs_module()) %in% names(src_ref_function()))]
+  })
+  
+  #transformation output function
+  src_origin_mdl <- callModule(checkD, "dat1", source_columns)
+
+  src_ref_function <- reactive({
+    src_origin_mdl()
   })
 
-  output$TD <- renderDT({
-    TTout()
+  output$src_ref_output <- renderDT({
+    src_ref_function()
   })
 
-  output$TD_p2 <- renderDT({
-    TTout()
-  })
-
-  TTout <- reactive({
-    trgs()[, which(names(trgs()) %in% names(DT_p2()))]
-  })
-
-  vars <- callModule(checkD, "dat1", DTout)
-
-  DT_p2 <- reactive({
-    vars()
-  })
-
-  output$DT_p2 <- renderDT({
-    DT_p2()
-  })
-
-  output$selcCor <- renderUI({
-    selectInput("slcC", "Select columns with size, toc or together", choices = names(DT_p2())[-c(1, 2)], multiple = TRUE, width = "100%")
-  })
-
-  selcRem <- reactive({
-    input$slcC
+  output$ui_src_adjustfor <- renderUI({
+    selectInput("slcC", "Select columns with size, toc or together", choices = names(src_ref_function())[-c(1, 2)], multiple = TRUE, width = "100%")
   })
 
   # option to pick columns that will not be used for correction
-  output$selcRem <- renderUI({
-    selectInput("slcR", "Select columns to remove from correction", choices = names(DT_p2())[-c(1, 2)], multiple = TRUE, width = "100%")
+  output$ui_src_remove <- renderUI({
+    selectInput("slcR", "Select columns to remove from correction", choices = names(src_ref_function())[-c(1, 2)], multiple = TRUE, width = "100%")
   })
 
   # select p value threshold of normality for residuals
-  output$shapiroP <- renderUI({
-    sliderInput("shapiroP", "Shapiro-Wilk Univariate Normality Test p-value:", value = 0.05, min = 0.001, max = 1, step = 0.01)
+  output$ui_src_shapiro <- renderUI({
+    sliderInput("ui_src_shapiro", "Shapiro-Wilk Univariate Normality Test p-value:", value = 0.05, min = 0.001, max = 1, step = 0.01)
   })
 
   # sliderinput for corrplot R threshold
-  output$corR <- renderUI({
-    sliderInput("corR", "R", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = F)
+  output$ui_src_cor <- renderUI({
+    sliderInput("ui_src_cor", "R", value = 0.6, min = 0, max = 0.99, step = 0.1, animate = F)
   })
 
-  output$split <- renderUI({
-    sliderInput("split", "Split proportion", value = 0.9, min = 0.1, max = 0.99, step = 0.05, animate = F)
+  output$ui_src_split <- renderUI({
+    sliderInput("ui_src_split", "Split proportion", value = 0.9, min = 0.1, max = 0.99, step = 0.05, animate = F)
   })
 
-  selcCor <- reactive({
-    input$slcR
+  output$ui_src_applycor <- renderUI({
+    actionButton("ui_src_applycor", "Apply")
   })
 
-  output$applyCor <- renderUI({
-    actionButton("applyCor", "Apply")
+  output$ui_src_applymix <- renderUI({
+    actionButton("ui_src_applymix", "Use mixing")
   })
 
-  output$treeAcc <- renderUI({
-    actionButton("treeAcc", "Reset table")
-  })
-
-  output$applyMix <- renderUI({
-    actionButton("applyMix", "Use mixing")
-  })
-
-  backframeDt <- eventReactive(input$applyCor, {
-    # print("using function backframeDt")
-    # print(input$corBut)
+  src_corr_function <- eventReactive(input$ui_src_applycor, {
     if (input$corBut == "Cor") {
-      datas <- DT_p2()
-      datas <- corect.func(as.data.frame(datas), input$corR, input$shapiroP, input$slcC, input$slcR)
+      datas <- src_ref_function()
+      datas <- corect.func(as.data.frame(datas), input$ui_src_cor, input$ui_src_shapiro, input$slcC, input$slcR)
       datas <- datas[, -which(names(datas) %in% c("formula"))]
       datas$id <- seq(1, nrow(datas))
       if (!is.null(datas)) {
@@ -125,19 +114,14 @@ server <- function(input, output, session) {
     }
   })
 
-  convOptions <- reactive({
-    datas <- backframeDt()
-  })
-
-  output$convOptions <- renderDT({
-    if (!is.null(convOptions())) {
-      datas <- convOptions()
+  output$src_corr_function <- renderDT({
+    if (!is.null(src_corr_function())) {
+      datas <- src_corr_function()
       colnames(datas)[5] <- "Formula"
       datas[, 5] <- (gsub("I(datas$", replacement = "(", datas[, 5], fixed = T))
       datas[, 5] <- (gsub("datas$", replacement = "", datas[, 5], fixed = T))
       datas[, 5] <- (gsub("I", replacement = "", datas[, 5], fixed = T))
       datas[, 5] <- (gsub("logI", replacement = "log", datas[, 5], fixed = T))
-      # datas$id <- seq (1, nrow(datas))
       if (!is.null(datas)) {
         datas
       } else {
@@ -148,11 +132,11 @@ server <- function(input, output, session) {
     }
   })
 
-  fDt <- reactive({
-    if (!is.null(convOptions())) {
-      dat <- convOptions()
-      valTable <- dat
-      varr <- valTable %>% group_by(source, element)
+  corr_formulas_function <- reactive({
+    if (!is.null(src_corr_function())) {
+      dat <- src_corr_function()
+      val_table <- dat
+      varr <- val_table %>% group_by(source, element)
       f <- varr %>% arrange(-desc(residualsSD), desc(Cooks), .by_group = TRUE)
       f <- f %>%
         group_by(source, element) %>%
@@ -172,10 +156,10 @@ server <- function(input, output, session) {
     }
   })
 
-  convFDt <- reactive({
-    if (!is.null(convOptions())) {
-      dat1 <- convOptions()
-      dat2 <- finalDtrg()
+  corr_formulas_validtab_formula <- reactive({
+    if (!is.null(src_corr_function())) {
+      dat1 <- src_corr_function()
+      dat2 <- correct_formulas_function()
       dat <- dat1[which(dat1$id %in% dat2$id), ]
       dat <- cbind(dat[, 1], 0, dat[, 2:ncol(dat)])
       dat
@@ -185,22 +169,18 @@ server <- function(input, output, session) {
     }
   })
 
-  output$convFDt <- renderDT({
-    convFDt()
-  })
-
-  outputCorrected <- reactive({
+  corrected_function <- reactive({
     if (input$corBut == "Cor") {
-      req(DT_p2()) # source data
-      req(convFDt()) # formulas format
-      req(TTout()) # Target data
-      req(input$trgS)
+      req(src_ref_function()) # source data
+      req(corr_formulas_validtab_formula()) # formulas format
+      req(target_function()) # target data
+      req(input$ui_src_targets)
 
-      datas <- DT_p2()
+      datas <- src_ref_function()
       datas <- datas[, which(!colnames(datas) %in% input$slcR)]
-      target <- as.data.frame(TTout())
+      target <- as.data.frame(target_function())
       target <- target[, which(!colnames(target) %in% input$slcR)]
-      y <- as.data.frame(convFDt())
+      y <- as.data.frame(corr_formulas_validtab_formula())
       x <- as.data.frame(datas)
       output <- list()
       slopes <- list()
@@ -217,7 +197,6 @@ server <- function(input, output, session) {
         }
       }
 
-
       y <- slopes
       slopes.DT <- data.frame(matrix(NA, nrow = 8, ncol = 3))
 
@@ -232,6 +211,9 @@ server <- function(input, output, session) {
       }
 
       colnames(slopes.DT) <- c("var1", "var2", "var1*var2")
+      slopes.DT_names <- rep (NA, nrow (slopes.DT))
+      slopes.DT_names[seq(1,length(as.character(correct_formulas_function()[,1])))] <- as.character(correct_formulas_function()[,1])
+      slopes.DT <- cbind (slopes.DT_names, slopes.DT)
 
       cleanT <- function(x) {
         x <- (gsub("I(datas$", replacement = "(", x, fixed = T))
@@ -242,14 +224,15 @@ server <- function(input, output, session) {
       drops <- lapply(drops, cleanT)
 
       drops <- plyr::ldply(drops, rbind)
+      rownames(drops) <- target[,1]
 
       list(output, slopes.DT, drops)
     } else {
-      req(DT_p2())
-      req(TTout())
+      req(src_ref_function())
+      req(target_function())
       output <- list()
-      for (i in seq(1, nrow(TTout()))) {
-        datas <- DT_p2()
+      for (i in seq(1, nrow(target_function()))) {
+        datas <- src_ref_function()
         output [[i]] <- datas
       }
       print("function outputcorrected")
@@ -257,30 +240,30 @@ server <- function(input, output, session) {
     }
   })
 
-  output$trgS <- renderUI({
-    selectInput("trgS", "Target ID", choices = seq(1, nrow(TTout())), selected = 1)
+  output$ui_src_targets <- renderUI({
+    selectInput("ui_src_targets", "Target ID", choices = seq(1, nrow(target_function())), selected = 1)
   })
 
-  tabList <- reactive({
-    req(outputCorrected())
-    outputCorrected() [[1]][[as.numeric(input$trgS)]]
+  correct_src_selected_function <- reactive({
+    req(corrected_function())
+    corrected_function() [[1]][[as.numeric(input$ui_src_targets)]]
   })
 
-  output$tabList <- renderDT({
-    tabList()
+  output$correct_src_selected_output <- renderDT({
+    correct_src_selected_function()
   })
 
-  output$tabLslopes <- renderDT({
-    outputCorrected() [[2]]
+  output$correct_src_slopes_output <- renderDT({
+    corrected_function() [[2]]
   })
 
-  output$tabLdrops <- renderDT({
-    outputCorrected() [[3]]
+  output$correct_src_drops_output <- renderDT({
+    corrected_function() [[3]]
   })
 
-  output$fDt <- renderDT({
-    if (!is.null(fDt())) {
-      dat <- fDt()[, c(3, 2, 1, 6, 4, 5)]
+  output$corr_formulas_output <- renderDT({
+    if (!is.null(corr_formulas_function())) {
+      dat <- corr_formulas_function()[, c(3, 2, 1, 6, 4, 5)]
       datatable(dat, filter = "top", options = list(
         pageLength = 5, autoWidth = F
       ))
@@ -289,14 +272,11 @@ server <- function(input, output, session) {
     }
   })
 
-  selectPick <- reactive({
-    fDt()[input$fDt_rows_selected, ]
-  })
 
-  # observe rows selected
-  output$selDat <- renderUI({
+  # radio button serve as indicator of user choice or default choice
+  output$ui_formulas_selected <- renderUI({
     radioButtons(
-      "selDat", "Select data :",
+      "ui_formulas_selected", "Select data :",
       c(
         "Top rank" = "def",
         "User choice" = "sel"
@@ -304,86 +284,88 @@ server <- function(input, output, session) {
     )
   })
 
-  output$finalDtrg <- renderDT({
-    datatable(finalDtrg(), filter = "top", options = list(
-      pageLength = 5, autoWidth = F
-    ))
+  #get the top ranked formulas as function
+  correct_formulasdef_function <- reactive({
+    dat <- corr_formulas_function()
+    datas <- dat[which(dat$rank == 1), ]
   })
 
-  finalDtrg <- reactive({
-    req(input$selDat)
-    if (input$selDat == "def") {
-      datas <- topPick()
+  #if the radio button on default, in the function output top picks, else selected user choice
+  correct_formulas_function <- reactive({
+    req(input$ui_formulas_selected)
+    if (input$ui_formulas_selected == "def") { #if it is default, have as an output top table
+      datas <- correct_formulasdef_function()
     } else {
-      datas <- selectPick()
+      datas <- corr_formulas_selected_function() #if it is user choice, have an output selected
     }
     datas
   })
 
-
-  output$topPick <- renderDT({
-    datatable(topPick(), filter = "top", options = list(
+  #table of top picks
+  output$correct_formulasdef_output <- renderDT({
+    datatable(correct_formulasdef_function(), filter = "top", options = list(
       pageLength = 5, autoWidth = F
     ))
   })
 
-  topPick <- reactive({
-    dat <- fDt()
-    datas <- dat[which(dat$rank == 1), ]
+  #selected formulas after corretion #take the output of top choices, and apply selection
+  corr_formulas_selected_function <- reactive({
+    correct_formulasdef_function()[input$correct_formulasdef_output_rows_selected, ] #check
   })
 
-  output$selVarplot <- renderUI({
-    if (!is.null(input$selDat)) {
-      if (input$selDat == "def") {
-        selectInput("selVarplot", label = "Select Element", choices = fDt()[which(fDt()$rank == 1), 3])
+  #table of final picks
+  output$correct_formulas_output <- renderDT({
+    datatable(correct_formulas_function(), filter = "top", options = list(
+      pageLength = 5, autoWidth = F
+    ))
+  })
+
+  output$ui_corvar_plot <- renderUI({
+    if (!is.null(input$ui_formulas_selected)) {
+      if (input$ui_formulas_selected == "def") {
+        selectInput("ui_corvar_plot", label = "Select Element", choices = correct_formulas_function()[, 3])
       } else {
-        selectInput("selVarplot", label = "Select Element", choices = fDt()[input$fDt_rows_selected, 3])
+        selectInput("ui_corvar_plot", label = "Select Element", choices = correct_formulas_function()[, 3])
       }
     } else {}
   })
 
   # regressions plot function
-  regPlotfunc <- reactive({
-    req(topPick())
-    # req (input$selVarplot)
-    datas <- DT_p2()
-
-    # print (input$selDat)
-
-    if (!is.null(input$selDat)) {
-      if (input$selDat == "def") {
-        if (!is.null(input$selVarplot)) {
-          sclass <- topPick()[which(topPick()[, 3] == input$selVarplot), 4]
+  regression_plot_function <- reactive({
+    req(correct_formulasdef_function())
+    datas <- src_ref_function()
+    if (!is.null(input$ui_formulas_selected)) {
+      if (input$ui_formulas_selected == "def") {
+        if (!is.null(input$ui_corvar_plot)) {
+          sclass <- correct_formulasdef_function()[which(correct_formulasdef_function()[, 3] == input$ui_corvar_plot), 4]
           sclass <- as.character(sclass)
           datas <- datas[which(datas[, 2] == sclass), ]
         } else {}
       } else {
-        if (!is.null(input$selVarplot)) {
-          sclass <- selectPick()[which(selectPick()[, 3] == input$selVarplot), 4]
+        if (!is.null(input$ui_corvar_plot)) {
+          sclass <- corr_formulas_selected_function()[which(corr_formulas_selected_function()[, 3] == input$ui_corvar_plot), 4]
           sclass <- as.character(sclass)
           datas <- datas[which(datas[, 2] == sclass), ]
           datas
         } else {}
       }
     }
-
-    # print (datas)
     datas
   })
 
   # regressions plot output
-  output$regPlot <- renderPlot({
-    req(input$selDat)
-    req(input$selVarplot)
-    req(selectPick())
+  output$regression_plot_output <- renderPlot({
+    req(input$ui_formulas_selected)
+    req(input$ui_corvar_plot)
+    req(corr_formulas_selected_function())
     req(input$slcC)
 
     dats <- NULL
-    dats <- selectPick()
+    dats <- corr_formulas_selected_function()
     slcC <- input$slcC
 
-    if (dim(dats)[1] < 1 & input$selDat == "sel") {} else {
-      datas <- regPlotfunc()
+    if (dim(dats)[1] < 1 & input$ui_formulas_selected == "sel") {} else {
+      datas <- regression_plot_function()
 
       if (length(slcC) > 1) {
         var1 <- as.numeric(datas[, slcC[1]])
@@ -395,8 +377,7 @@ server <- function(input, output, session) {
 
       datas[, 3:dim(datas)[2]] <- apply(datas[, 3:dim(datas)[2]], 2, as.numeric)
 
-      f <- input$selVarplot
-
+      f <- input$ui_corvar_plot
       f <- sub("^.", "I(datas$", f)
       f <- sub("(var1", "I(var1", f, fixed = T)
       f <- sub("(var2", "I(var2", f, fixed = T)
@@ -405,49 +386,37 @@ server <- function(input, output, session) {
       fit <- lm(eval(parse(text = f)))
       par(mfrow = c(1, 3))
 
-
       cooksd <- cooks.distance(fit)
       plot(cooksd, cex = 2, main = "Influential Obs by Cooks distance")
       lines(lowess(cooksd), col = "blue")
-
       plot(fitted(fit), residuals(fit))
       lines(lowess(fitted(fit), residuals(fit)))
       title("Residual vs Fit. value ", col = "red")
-
       acf(residuals(fit), main = "")
       title("Residual Autocorrelation Plot")
     }
   })
 
   output$xvar <- renderUI({
-    selectInput("xvar", "Observed, Xvar", choices = names(tabList())[-c(1, 2)])
+    selectInput("xvar", "Observed, Xvar", choices = names(correct_src_selected_function())[-c(1, 2)])
   })
 
   output$yvar <- renderUI({
-    selectInput("yvar", "Corrected, Yvar", choices = names(tabList())[-c(1, 2)])
+    selectInput("yvar", "Corrected, Yvar", choices = names(correct_src_selected_function())[-c(1, 2)])
   })
 
   output$scatterplot1 <- renderScatterD3({
     req(input$xvar)
     req(input$yvar)
-    # scatterD3(data = data, x=mpg, y=carb,
-    mtdf <- tabList()
-    dtorg <- DT_p2()
-
+    mtdf <- correct_src_selected_function()
+    dtorg <- src_ref_function()
     x <- dtorg[[input$xvar]]
     Sclass <- dtorg [, 2]
     y <- mtdf[[input$yvar]]
-
     scatterD3(
       x = x, y = y,
       labels_size = 9, point_opacity = 1, col_var = Sclass,
       lines = data.frame(slope = 1, intercept = Inf),
-      # col_var=cyl, symbol_var= data$Assay,
-      # lab= paste(mpg, carb, sep="|") , lasso=TRUE,
-      # xlab= "IFN-<U+03B3>", ylab= "IL-10",
-      # click_callback = "function(id, index) {
-      #  alert('scatterplot ID: ' + id + ' - Point index: ' + index)
-      #  }",
       transitions = T
     )
   })
@@ -456,14 +425,14 @@ server <- function(input, output, session) {
     sliderInput("brack_rng", "Bracket range parameter", value = 0.1, min = 0, max = 3, step = 0.05)
   })
 
-  tarBrackets <- reactive({
-    req(outputCorrected())
-    req(TTout())
+  targets_brackets_function <- reactive({
+    req(corrected_function())
+    req(target_function())
     req(input$brack_rng)
-    x <- outputCorrected()[[1]] # list of sources corrected
-    datas <- DT_p2()
+    x <- corrected_function()[[1]] # list of sources corrected
+    datas <- src_ref_function()
     datas <- datas[, which(!names(datas) %in% names(x[[1]]))]
-    y <- trgs() # list of targets corrected
+    y <- trgs_module() # list of targets corrected
 
     dat <- NULL
     trg <- NULL
@@ -475,15 +444,13 @@ server <- function(input, output, session) {
     }
 
     dat[, 1] <- factor(as.character(dat[, 1]), levels = c(as.character(dat[, 1])))
-
     list(dat, trg)
   })
 
-  output$trgBrkts <- renderDT({
-    req(tarBrackets())
-    dat <- tarBrackets()
+  output$targets_brackets_output <- renderDT({
+    req(targets_brackets_function())
+    dat <- targets_brackets_function()
     selection <- dat[[2]]
-    # trgDat <<- dat
 
     DT::datatable(dat[[1]]) %>% formatStyle(
       c(colnames(dat[[1]])),
@@ -491,9 +458,9 @@ server <- function(input, output, session) {
     )
   })
 
-  trgdropList <- reactive({
-    req(tarBrackets())
-    dat <- tarBrackets()
+  target_droplist_function <- reactive({
+    req(targets_brackets_function())
+    dat <- targets_brackets_function()
     x <- dat[[1]]
     trg <- list()
     for (i in seq(1, nrow(x))) {
@@ -510,14 +477,14 @@ server <- function(input, output, session) {
     trg
   })
 
-  output$trg.drops <- renderDT(
-    d(),
+  output$target_droplist_output <- renderDT(
+    target_removed_function(),
     selection = "multiple"
   )
 
-  d <- reactive({
-    req(trgdropList())
-    trg <- trgdropList()
+  target_removed_function <- reactive({
+    req(target_droplist_function())
+    trg <- target_droplist_function()
     dat <- NULL
     for (i in seq(1, length(trg))) {
       tname <- names(trg)[i]
@@ -529,16 +496,16 @@ server <- function(input, output, session) {
     dat
   })
 
-  dfaReactive <- reactive({
-    req(outputCorrected())
-    sourceList <- outputCorrected()[[1]]
-    d <- data.frame(d())
-    if (!is.null(input$trg.drops_rows_selected)) {
-      d <- d[-input$trg.drops_rows_selected, ]
+  dfa_apply_function <- reactive({
+    req(corrected_function())
+    sourceList <- corrected_function()[[1]]
+    d <- data.frame(target_removed_function())
+    if (!is.null(input$target_droplist_output_rows_selected)) {
+      d <- d[-input$target_droplist_output_rows_selected, ]
     }
     d[, 1] <- as.character(d[, 1])
     d[, 2] <- as.character(d[, 2])
-    x <- tarBrackets()[[1]]
+    x <- targets_brackets_function()[[1]]
     x[, 1] <- as.character(x[, 1])
 
     y <- sourceList
@@ -553,13 +520,20 @@ server <- function(input, output, session) {
   })
 
 
+#Pick up here
+####################################################################################################################################
+####################################################################################################################################
+####################################################################################################################################
+####################################################################################################################################
+
+
   dfaList_x <- eventReactive(input$applyDFA, {
-    req(dfaReactive())
-    req(TTout())
-    datas <- dfaReactive()
+    req(dfa_apply_function())
+    req(target_function())
+    datas <- dfa_apply_function()
     dfaList <- NULL
     sourceList <- datas
-    targetList <- TTout()
+    targetList <- target_function()
 
     for (i in seq(1, nrow(targetList))) {
       dfa <- data.frame(matrix(data = 0, nrow = 1, ncol = (length(colnames(targetList)) - 2)))
@@ -576,28 +550,28 @@ server <- function(input, output, session) {
     if (input$rbDFA == "def") {
       dfaList_x()
     } else {
-      dat <- TTout()
+      dat <- target_function()
       d <- dim(dat)
       dat_output <- data.frame(matrix(100, nrow = d[1], ncol = (d[2] - 2)))
       colnames(dat_output) <- names(dat)[-c(1, 2)]
-      dat_output <- dat_output[, -c(which(colnames(dat_output) %in% d()[, 2]))]
+      dat_output <- dat_output[, -c(which(colnames(dat_output) %in% target_removed_function()[, 2]))]
       rownames(dat_output) <- NULL
       dat_output
     }
   )
 
-  mixingOutput <- eventReactive(input$applyMix, {
+  mixingOutput <- eventReactive(input$ui_src_applymix, {
     req(dfaList_x())
     req(input$rbMix)
-    l <- outputCorrected()[[1]]
+    l <- corrected_function()[[1]]
     DFA_l <- dfaList_x()
-    targetD <- as.data.frame(TTout())
+    targetD <- as.data.frame(target_function())
     finalDat <- NULL
 
     if (input$rbMix == "all") {
 
     } else {
-      l <- l[which(TTout()[, 1] %in% input$selected_targets)]
+      l <- l[which(target_function()[, 1] %in% input$selected_targets)]
       targetD <- targetD[which(targetD[, 1] %in% input$selected_targets), ]
       DFA_l <- DFA_l[which(targetD[, 1] %in% input$selected_targets), ]
     }
@@ -608,7 +582,7 @@ server <- function(input, output, session) {
       x <- l[[i]]
       uniSource <- unique(x[, 2])
       uniSource <- as.character(uniSource)
-      split <- input$split
+      ui_src_split <- input$ui_src_split
       modelOutput <- NULL
       print(paste0("Mixing source: ", i))
 
@@ -617,7 +591,7 @@ server <- function(input, output, session) {
         inputValidate <- NULL
         for (i2 in seq(1, length(uniSource))) {
           dat <- x[which(x[, 2] == uniSource[i2]), ]
-          train_index <- sample(1:nrow(dat), nrow(dat) * split)
+          train_index <- sample(1:nrow(dat), nrow(dat) * ui_src_split)
           training_dat <- dat[train_index, ]
           validate_dat <- dat[-train_index, ]
           inputTrain <- rbind(inputTrain, training_dat)
@@ -683,7 +657,7 @@ server <- function(input, output, session) {
     datGloba_plot <<- dat
     dat <- dat[grep("target", rownames(dat)), ]
 
-    un <- rownames(dat[which(rownames(dat) %in% as.character(TTout()[, 1])), ])
+    un <- rownames(dat[which(rownames(dat) %in% as.character(target_function()[, 1])), ])
 
     if (!is.null(input$selected_targets)) {
       dat <- dat[which(rownames(dat) %in% input$selected_targets), ]
@@ -692,16 +666,17 @@ server <- function(input, output, session) {
     selectInput("targetPlot", "Select target", un, selected = NULL)
   })
 
-  output$viPlot <- renderPlot({
+  output$srcPlot <- renderUI ({
+
+
+  })
+
+  output$trg_mixing_plot <- renderPlot({
     req(mixingOutput())
     dat <- as.data.frame(mixingOutput())
     dat <- dat[grep("target", rownames(dat)), ]
     targNames <- rownames(dat)
-
-    # targGlobal <<- targNames
     targetSelected <- dat$Target[which(rownames(dat) %in% input$targetPlot)]
-    # input$targetPlot
-
     dat <- melt(dat)
     # datmeltGlobal <<- dat
     tryCatch({
@@ -713,16 +688,27 @@ server <- function(input, output, session) {
     }, warning = function(cond) {}, error = function(cond) {})
   }, height = 400, width = 600)
 
+
+  output$src_mixing_plot <- renderPlot ({
+    req (mixingOutput ())
+    dat <- as.data.frame (mixingOutput ())
+    targs <- dat[grep("target", rownames(dat)), ]
+    dat <- dat[!which(rownames(dat) %in% rownames(targs))]
+    dat <- melt(dat)
+    print (dat)
+
+  })
+
   output$radioBut <- renderUI({
     radioButtons("rbMix", "Select mixing", choices = c("all", "subset"), selected = "all")
   })
 
   output$selectTarget <- renderUI({
     req(input$rbMix)
-    # print (TTout())
+    # print (target_function())
     if (input$rbMix == "all") { } else {
       checkboxGroupInput("selected_targets", "Targets",
-        choices = unique(as.character(TTout()[, 1])), selected = unique(as.character(TTout()[, 1])), inline = FALSE,
+        choices = unique(as.character(target_function()[, 1])), selected = unique(as.character(target_function()[, 1])), inline = FALSE,
         width = NULL
       )
     }
@@ -749,6 +735,9 @@ server <- function(input, output, session) {
       selected = "def"
     )
   })
+
+  output$verb1 <- renderText({"dat 1"})
+  output$verb2 <- renderText({"dat 2"})
 }
 
 
@@ -759,10 +748,14 @@ ui <- dashboardPage(
   ## Sidebar content
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Input", tabName = "dataInput", icon = icon("upload")),
+      menuItem ('Input', tabName = 'dataInput', icon = icon ('upload')),
+      menuItem("Transformations & Outliers", icon = icon("upload"),
+               menuSubItem('TRANSFORMATION', tabName = 'Transformations'),
+               menuSubItem('OUTLIERS', tabName = 'Outliers')),
       menuItem("Size & TOC Correction", tabName = "regressions", icon = icon("random")),
       menuItem("Discriminant Function Analysis", tabName = "DFA", icon = icon("table")),
-      menuItem("Mixing Model", tabName = "mixmod", icon = icon("cubes")) # ,
+      menuItem("Mixing Model", tabName = "mixmod", icon = icon("cubes"))
+      # ,
       # menuItem("ML Model", tabName = "mlmod", icon = icon("circle"))
     )
   ),
@@ -776,6 +769,7 @@ ui <- dashboardPage(
             fluidPage(
               fluidRow(
                 sidebarLayout(
+                  div(style="width: 50%;",
                   sidebarPanel(
                     fluidRow(
                       column(
@@ -783,21 +777,24 @@ ui <- dashboardPage(
                         csvFileInput("file1", "User data (.csv format)"),
                         columnChooserUI("dat1")
                       )
-                    )
+                    ), width =4)
                   ),
                   mainPanel(
+                    width = 10,
                     fluidRow(
                       tabsetPanel(
                         tabPanel(
                           "Data",
                           column(
                             width = 12,
-                            DTOutput("DT"),
+                            DTOutput("source_origin"),
                             style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                           )
                         ),
-                        tabPanel(
-                          "Plots",
+                        navbarMenu(
+                          "QQ-Plots",
+                          tabPanel(
+                            'Corplot',
                           fluidRow(
                             column(
                               width = 9,
@@ -807,160 +804,17 @@ ui <- dashboardPage(
                             column(
                               width = 3,
                               mat_par("dat1")
-                            ),
+                            )
+                          )
+                        ),
+                          tabPanel(
+                            'Distribution',
                             column(
                               width = 12,
                               br(),
                               srcDCor("dat1")
-                            )
                           )
-                        )
-                      )
-                    )
-                  )
-                )
-              ),
-              tabsetPanel(
-                tabPanel(
-                  "Original Data p-values",
-                  box(
-                    title = textOutput("origTitle"), status = "success", height = "630", width = 12, solidHeader = T,
-                    column(
-                      width = 12,
-                      srcSP("dat1"),
-                      style = "height: 550px; overflow-y: scroll; overflow-x: scroll;"
-                    )
-                  )
-                ),
-                tabPanel(
-                  "Transformations Advanced",
-                  tabsetPanel(
-                    tabPanel(
-                      "Methods",
-                      box(
-                        title = "Methods p-values ", status = "danger", height = "630", width = 12, solidHeader = T,
-                        column(
-                          width = 12,
-                          getspMethods("dat1"),
-                          style = "height:550px; overflow-y: scroll;overflow-x: scroll;"
-                        )
-                      )
-                    ),
-                    tabPanel(
-                      "Transformed p-values",
-                      box(
-                        title = "Methods p-values ", status = "danger", height = "630", width = 12, solidHeader = T,
-                        column(
-                          width = 12,
-                          getspPval("dat1"),
-                          style = "height: 550px; overflow-y: scroll; overflow-x: scroll;"
-                        )
-                      )
-                    ),
-                    tabPanel(
-                      "QQ Plots",
-                      box(
-                        title = "QQ plot of Original Data", status = "success", height = "1250", width = 6, solidHeader = T,
-                        column(
-                          width = 10,
-                          style = "height:100px;",
-                          spPlotpick("dat1")
-                        ),
-                        getorigQQval("dat1"), style = "height:1200px;overflow-y: scroll;overflow-x: scroll;",
-                        column(
-                          width = 6
-                        )
-                      ),
-                      box(
-                        title = "QQ plot of Transformed Data", status = "success", height = "1250", width = 6, solidHeader = T,
-                        column(
-                          width = 10,
-                          style = "height:100px;",
-                          shapiroP("dat1")
-                        ),
-                        getspQQval("dat1"), style = "height:1200px;overflow-y: scroll;overflow-x: scroll;", # 570
-                        column(
-                          width = 6
-                        )
-                      )
-                    )
-                  )
-                ),
-                tabPanel(
-                  "Outliers",
-                  fluidPage(
-                    fluidRow(
-                      box(
-                        title = "Data: Original ", status = "success", height =
-                          "595", width = "12", solidHeader = T,
-                        column(
-                          width = 12,
-                          downloadButton("downloadData", "Download"),
-                          br(),
-                          tags$hr(),
-                          outliersTab1("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
-                        )
-                      )
-                    )
-                  )
-                ),
-                tabPanel(
-                  "Outliers Advanced",
-                  tabsetPanel(
-                    tabPanel(
-                      "Transformed Data & Outliers",
-                      box(
-                        title = "Data: Transformed ", status = "warning", height =
-                          "595", width = 12, solidHeader = T,
-                        column(
-                          width = 12,
-                          outliersADtab1("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
-                        )
-                      )
-                    ),
-                    tabPanel(
-                      "Edit Table To Keep/Remove Outliers",
-                      box(
-                        # tags$style(HTML(".js-irs-1 .irs-single, .js-irs-1 .irs-bar-edge, .js-irs-1 .irs-bar {background: green;}")),
-                        # tags$style(HTML(".js-irs-1 .irs-single, .js-irs-1 .irs-bar-edge, .js-irs-1 .irs-grid-text { font-size: 10pt;}")),
-                        nStd("dat1"),
-                        title = "Select Or Deselect Rows ", status = "success", height =
-                          "695", width = 12, solidHeader = T,
-                        column(
-                          width = 12,
-                          outliersADtab2("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
-                        )
-                      ),
-                      box(
-                        title = "Standard Normal Deviate", status = "success", height = "600", width = 12, solideHeader = T,
-                        column(
-                          width = 12,
-                          stdTab1("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
-                        )
-                      )
-                    ),
-                    tabPanel(
-                      "Outliers Removed",
-                      box(
-                        title = "These Rows Will Be Excluded From Final Output ", status = "danger", height =
-                          "595", width = 12, solidHeader = T,
-                        column(
-                          width = 12,
-                          outliersADtab3("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
-                        )
-                      )
-                    ),
-                    tabPanel(
-                      "Final Output",
-                      box(
-                        title = "Final Output Table", status = "success", height =
-                          "595", width = 12, solidHeader = T,
-                        column(
-                          width = 12,
-                          br(),
-                          downloadButton("downloadData2", "Download"),
-                          tags$hr(),
-                          outliersADtab4("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
+                         )
                         )
                       )
                     )
@@ -974,6 +828,7 @@ ui <- dashboardPage(
             fluidPage(
               fluidRow(
                 sidebarLayout(
+                  div(style="width: 50%;",
                   sidebarPanel(
                     fluidRow(
                       column(
@@ -981,21 +836,26 @@ ui <- dashboardPage(
                         csvFileInput("file2", "User data (.csv format)"),
                         columnChooserUI("dat2")
                       )
+                    ),
+                    width = 4
                     )
                   ),
                   mainPanel(
+                    width = 10,
                     fluidRow(
                       tabsetPanel(
                         tabPanel(
                           "Data",
                           column(
                             width = 12,
-                            DTOutput("TD"),
+                            DTOutput("trgs_origin"),
                             style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                           )
                         ),
-                        tabPanel(
+                        navbarMenu(
                           "Plots",
+                        tabPanel(
+                          "Corplot",
                           fluidRow(
                             column(
                               width = 9,
@@ -1006,12 +866,16 @@ ui <- dashboardPage(
                               width = 3,
                               mat_par("dat2")
                             )
-                          ),
+                          )
+                        ),
+                        tabPanel (
+                          'Distribution',
                           column(
                             width = 12,
                             br(),
                             srcDCor("dat2")
                           )
+                        )
                         )
                       )
                     )
@@ -1022,6 +886,100 @@ ui <- dashboardPage(
           )
         )
       ),
+      tabItem (
+        tabName = 'Transformations',
+        box(
+            title = ("Shapiro-Wilk test of normality, p values before and after transformations"), status = "success", height = "auto", width = 12, solidHeader = T,
+            fluidPage(
+              title = 'Adjust p-value',
+              sidebarLayout(
+                div(style="width: 50%;",
+                sidebarPanel (
+                  shapiroP("dat1"),
+                  spPlotpick("dat1")
+                )
+                ),
+                mainPanel (
+                  width = 10,
+                    column(
+                    width = 12,
+                    tabsetPanel (
+                      tabPanel(
+                        "Untransformed data, Shapiro-Wilk p values",
+                        srcSP("dat1"),
+                        style = "height: 550px; overflow-y: scroll; overflow-x: scroll;"
+                      ),
+                      navbarMenu(
+                        "Transformations",
+                        tabPanel(
+                          'Methods',
+                          box(
+                            title = "Methods p-values ", status = "danger", height = "630", width = 12, solidHeader = T,
+                            column(
+                              width = 12,
+                              getspMethods("dat1"),
+                              style = "height:550px; overflow-y: scroll;overflow-x: scroll;"
+                            )
+                          )
+                        ),
+                        tabPanel(
+                          'Achieved p-values',
+                          box(
+                            title = "Methods p-values ", status = "danger", height = "630", width = 12, solidHeader = T,
+                            column(
+                              width = 12,
+                              getspPval("dat1"),
+                              style = "height: 550px; overflow-y: scroll; overflow-x: scroll;"
+                            )
+                          )
+                        )
+                      ),
+                      tabPanel(
+                        'Plots',
+                        box(
+                          title = "QQ plot of Original Data", status = "success", height = "auto", width = 6, solidHeader = T,
+                          column(
+                            width = 10,
+                            style = "height:100px;"
+                          ),
+                          getorigQQval("dat1"), style = "height:630px;overflow-y: scroll;overflow-x: scroll;",
+                          column(
+                            width = 6
+                          )
+                        ),
+                        box(
+                          title = "QQ plot of Transformed Data", status = "success", height = "auto", width = 6, solidHeader = T,
+                          column(
+                            width = 10,
+                            style = "height:100px;"
+                          ),
+                          getspQQval("dat1"), style = "height:630px;overflow-y: scroll;overflow-x: scroll;", # 570
+                          column(
+                            width = 6
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+      ),
+      tabItem(
+        tabName = 'Outliers',
+          box(
+            title = "Data: Original ", status = "success", height =
+              "595", width = "12", solidHeader = T,
+            column(
+              width = 12,
+              # downloadButton("downloadData", "Download"),
+              # br(),
+              tags$hr(),
+              outliersTab1("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
+            )
+        )
+      ),
       tabItem( # First tab content
         tabName = "regressions",
         tabsetPanel(
@@ -1029,14 +987,14 @@ ui <- dashboardPage(
             "Sources",
             column(
               width = 12,
-              DTOutput("DT_p2"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+              DTOutput("src_ref_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
             )
           ),
           tabPanel(
             "Target",
             column(
               width = 12,
-              DTOutput("TD_p2"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+              DTOutput("trgs_origin_mdl"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
             )
           ),
           tabPanel(
@@ -1044,17 +1002,17 @@ ui <- dashboardPage(
             sidebarLayout(
               sidebarPanel(
                 uiOutput("corBut"),
-                uiOutput("selcCor"), # ,
-                uiOutput("selcRem"),
-                uiOutput("shapiroP"),
-                uiOutput("corR"),
-                uiOutput("applyCor")
+                uiOutput("ui_src_adjustfor"), # ,
+                uiOutput("ui_src_remove"),
+                uiOutput("ui_src_shapiro"),
+                uiOutput("ui_src_cor"),
+                uiOutput("ui_src_applycor")
               ),
               mainPanel(
                 box(
                   title = "Available options", status = "success", height =
                     "auto", solidHeader = T, width = "auto",
-                  withSpinner(DTOutput("convOptions")), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  withSpinner(DTOutput("src_corr_function")), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 )
               )
             )
@@ -1067,12 +1025,12 @@ ui <- dashboardPage(
                 box(
                   title = "Formulas", status = "success", height =
                     "auto", solidHeader = T,
-                  DTOutput("fDt"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  DTOutput("corr_formulas_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 ),
                 box(
                   title = "Selected", status = "primary", height =
                     "auto", solidHeader = T,
-                  DTOutput("finalDtrg"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  DTOutput("correct_formulas_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 )
               ),
               column(
@@ -1080,14 +1038,14 @@ ui <- dashboardPage(
                 box(
                   title = "Top pick", status = "success", height =
                     "auto", solidHeader = T,
-                  DTOutput("topPick"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                  DTOutput("correct_formulasdef_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 ),
                 box(
                   title = "Plots", status = "success", height =
                     "auto", solidHeader = T,
-                  uiOutput("selDat"),
-                  uiOutput("selVarplot"),
-                  plotOutput("regPlot")
+                  uiOutput("ui_formulas_selected"),
+                  uiOutput("ui_corvar_plot"),
+                  plotOutput("regression_plot_output")
                 )
               )
             )
@@ -1097,19 +1055,22 @@ ui <- dashboardPage(
             tabsetPanel(
               tabPanel(
                 "Data",
+                column (
+                  width = 12,
+                  uiOutput("ui_src_targets"),
+                  DTOutput("correct_src_selected_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                ),
                 fluidRow(
-                  column(
+                  column (
                     width = 12,
-                    uiOutput("trgS"),
-                    DTOutput("tabList"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
-                  ),
-                  column(
-                    width = 6,
-                    DTOutput("tabLslopes"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
-                  ),
-                  column(
-                    width = 6,
-                    DTOutput("tabLdrops"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                    box (
+                      title = 'Slopes', status = 'primary', height = 'auto', solideHeader = T,
+                        DTOutput("correct_src_slopes_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                    ),
+                    box (
+                      title = 'Dropped', status = 'warning', height = 'auto', solideHeader = T,
+                        DTOutput("correct_src_drops_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                    )
                   )
                 )
               ),
@@ -1127,21 +1088,16 @@ ui <- dashboardPage(
               uiOutput("brack_range"),
               sidebarLayout(
                 sidebarPanel(
-                  DTOutput("trg.drops"),
+                  DTOutput("target_droplist_output"),
                   style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
-                  # shinyTree("tree",
-                  #   checkbox = TRUE, search = TRUE, theme = "proton", themeIcons = F,
-                  #   themeDots = F
-                  # ),
-                  # uiOutput('treeAcc')
+
                 ),
                 mainPanel(
-                  DTOutput("trgBrkts"),
+                  DTOutput("targets_brackets_output"),
                   style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                 )
               )
-            ) # ,
-            # DTOutput("trg.drops")
+            )
           )
         )
       ),
@@ -1170,8 +1126,8 @@ ui <- dashboardPage(
           fluidRow(
             sidebarLayout(
               sidebarPanel(
-                uiOutput("applyMix"),
-                uiOutput("split"),
+                uiOutput("ui_src_applymix"),
+                uiOutput("ui_src_split"),
                 uiOutput("radioBut"),
                 uiOutput("selectTarget"),
                 numericInput("mcsimulations", "Monte carlo simulations:", 2, min = 1, max = 1000)
@@ -1181,7 +1137,18 @@ ui <- dashboardPage(
                   width = 12,
                   withSpinner(DTOutput("mixingOutput")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;",
                   uiOutput("targetPlot"),
-                  plotOutput("viPlot", width = "100%")
+                  plotOutput("trg_mixing_plot", width = "100%")
+                  #uiOutput ('srcPlot'),
+                  #fluidRow (
+                   # column(
+                    #  width = 6,
+                      
+                    )#,
+                    #column(
+                     # width =6,
+                     # plotOutput ('src_mixing_plot', width = '100%')
+                    #)
+                  #)
                 )
               )
             )
@@ -1190,6 +1157,5 @@ ui <- dashboardPage(
       )
     )
   )
-)
 # Run the app ----
 shinyApp(ui, server)
