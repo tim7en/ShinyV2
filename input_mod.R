@@ -203,10 +203,25 @@ getorigQQval <- function(id) {
   plotlyOutput(ns("getorigQQval"))
 }
 
+getspQQval2 <- function(id) {
+  ns <- NS(id)
+  plotlyOutput(ns("getspQQval2"))
+}
+
+getorigQQval2 <- function(id) {
+  ns <- NS(id)
+  plotlyOutput(ns("getorigQQval2"))
+}
+
 # number of standard diviates from normal
 nStd <- function(id) {
   ns <- NS(id)
   uiOutput(ns("nStd"))
+}
+
+rbSl <- function(id) {
+  ns <- NS(id)
+  uiOutput (ns('rbSl'))
 }
 
 outliersTab1 <- function(id) {
@@ -365,7 +380,7 @@ checkD <- function(input, output, session, datas) {
     req(getspQQval())
     req (input$spPlotpick)
     datas <- getspQQval()
-    #tryCatch({
+    tryCatch({
       dat <- datas
       dat <- dat[order(dat[, 2]), ]
       suppressMessages(attach(dat))
@@ -388,35 +403,96 @@ checkD <- function(input, output, session, datas) {
       plot_dataframe[,2] <- paste(plot_dataframe[,2],plot_dataframe[,3], sep = ": ")
       #print (head(plot_dataframe))
       
-      print(
-        ggplotly(
-          ggplot(plot_dataframe, aes(sample = val, colour = Classes)) +
-            stat_qq() + #geom_text(aes(label = Label), vjust = -1)+
-            facet_wrap(~Classes, ncol = 2, scales = "free") +
-            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))
-        )
-      )
-    #}, warning = function(cond) {}, error = function(cond) {})
+      #print(
+       # ggplotly(
+      p <- ggplot(plot_dataframe, aes(sample = val, colour = Classes)) +
+            stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
+            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))#, legend.position = 'bottom')
+      #ggplotly(p) %>%
+       # layout(legend = list(orientation = "h", x = 0, y = -0.2))
+       # )
+     # )
+    }, warning = function(cond) {}, error = function(cond) {})
   })
 
   output$getorigQQval <- renderPlotly({
     req(is.factor(datas()[, 2]))
     req (input$spPlotpick)
 
-    #tryCatch({
+    tryCatch({
       dat <- datas()
       dat <- dat[order(dat[, 2]), ]
       suppressMessages(attach(dat))
       suppressWarnings(assign("val", get(input$spPlotpick)))
       colnames(dat)[2] <- "Classes"
-      print(
-        ggplotly(
-          ggplot(dat, aes(sample = val, colour = Classes)) +
-            stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
-            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))
-        )
-      )
+      #print(
+       # ggplotly(
+      p <- ggplot(dat, aes(sample = val, colour = Classes)) +
+            stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") + 
+            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))#, legend.position = 'bottom')
+      # ggplotly(p) %>%
+      #   layout(legend = list(orientation = "h", x = 0, y = -0.2))
+        #)
+     # )
       
+    }, warning = function(cond) {}, error = function(cond) {})
+  })
+  
+  # plotOutput of shapiro wilk transformations, before and after
+  output$getspQQval2 <- renderPlotly({
+    req(is.factor(datas()[, 2]))
+    methods_dataframe <- data.frame(getspMethods ())
+    #print (getspMethods())
+    req(getspQQval())
+    req (input$spPlotpick)
+    datas <- getspQQval()
+    #tryCatch({
+    dat <- datas
+    dat <- dat[order(dat[, 2]), ]
+    suppressMessages(attach(dat))
+    suppressWarnings(assign("val", get(input$spPlotpick)))
+    colnames(dat)[2] <- "Classes"
+    plot_annot <- data.frame (as.character(rownames(methods_dataframe)),as.character(methods_dataframe[input$spPlotpick]))
+    uniSource <- unique(as.character (rownames(methods_dataframe)))
+    #uniAnnot <- as.character(methods_dataframe[input$spPlotpick])
+    
+    uniAnnot <- (as.character(methods_dataframe[input$spPlotpick][,1]))
+    colnames(plot_annot) <- NULL
+    plot_dataframe <- cbind(dat[input$spPlotpick], dat$Classes)
+    plot_dataframe$annot <- 0
+    
+    for (i in seq (1,length(uniSource))){
+      ind <- which(as.character(plot_dataframe[,2]) == as.character(uniSource[i]))
+      plot_dataframe$annot[ind] <- uniAnnot[[i]]
+    }
+    colnames(plot_dataframe) <- c(input$spPlotpick, 'Classes', 'Label')
+    plot_dataframe[,2] <- paste(plot_dataframe[,2],plot_dataframe[,3], sep = ": ")
+    
+    p <- ggplot(plot_dataframe, aes(sample = val, colour = Classes)) +
+      stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
+      stat_qq_line()+ theme(panel.spacing = unit(2, "lines"), legend.position = 'bottom')
+    ggplotly(p,height = 800, width = 1000 ) %>%
+    layout(legend = list(orientation = "h", x = 0, y = -0.2))
+    #}, warning = function(cond) {}, error = function(cond) {})
+  })
+  
+  output$getorigQQval2 <- renderPlotly({
+    req(is.factor(datas()[, 2]))
+    req (input$spPlotpick)
+    
+    #tryCatch({
+    dat <- datas()
+    dat <- dat[order(dat[, 2]), ]
+    suppressMessages(attach(dat))
+    suppressWarnings(assign("val", get(input$spPlotpick)))
+    colnames(dat)[2] <- "Classes"
+    
+    p <- ggplot(dat, aes(sample = val, colour = Classes)) +
+      stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") + 
+      stat_qq_line()+ theme(panel.spacing = unit(2, "lines"), legend.position = 'bottom')
+    ggplotly(p ,height = 800, width = 1000 ) %>%
+      layout(legend = list(orientation = "h", x = 0, y = -0.2))
+    
     #}, warning = function(cond) {}, error = function(cond) {})
   })
 
@@ -424,6 +500,11 @@ checkD <- function(input, output, session, datas) {
   output$nStd <- renderUI({
     ns <- session$ns
     sliderInput(ns("nStd"), "Deviates From Standard Normal Mean For Outliers Detection:", value = 2.576, min = 0, max = 6, step = 0.01)
+  })
+  
+  output$rbSl <- renderUI({
+    ns <- session$ns
+    radioButtons(ns('rbSl'), 'User choice', choices = c('DEFAULT', 'USER'), selected = 'DEFAULT')
   })
 
   # showOutliers reactive function output
@@ -529,17 +610,6 @@ checkD <- function(input, output, session, datas) {
     }
   })
 
-  # DT table output for advanced table 1
-  output$outliersADtab1 <- renderDT({
-    datas <- outliersADtab1()
-    vals <- datas[[2]]
-    datas <- datas [[1]]
-    DT::datatable(datas) %>% formatStyle(
-      columns = colnames(datas),
-      backgroundColor = styleEqual(vals, rep("darksalmon", length(vals)))
-    )
-  })
-
   # compute data table of standard deviates
   showstd <- reactive({
     dfoutput <- getSubsetstd(getspQQval())
@@ -558,6 +628,16 @@ checkD <- function(input, output, session, datas) {
     output
   })
 
+  # DT table output for advanced table 1
+  output$outliersADtab1 <- renderDT({
+    datas <- outliersADtab1()
+    vals <- datas[[2]]
+    datas <- datas [[1]]
+    DT::datatable(datas) %>% formatStyle(
+      columns = colnames(datas),
+      backgroundColor = styleEqual(vals, rep("darksalmon", length(vals)))
+    )
+  })
   # output std data tab
   output$stdTab1 <- renderDT({
     if (!is.null(input$nStd)) {
@@ -566,13 +646,14 @@ checkD <- function(input, output, session, datas) {
       cut <- 2.576
     }
     DT::datatable(showstd()) %>% formatStyle(
-      c(colnames(showstd())),
-      backgroundColor = styleInterval(c(-(cut), cut), c("lightsalmon", "white", "lightsalmon")), fontWeight = "bold"
+      columns = c(colnames(showstd())),
+      backgroundColor = styleInterval(c(-(cut), cut), c("cyan", "white", "cyan"))#, fontWeight = "bold"
     )
   })
 
   # outliers advanced, tab 2 -> selection and diselection of data rows
   output$outliersADtab2 <- renderDT({
+    if (input$rbSl == 'DEFAULT'){
     datas <- outliersADtab1()
     vals <- datas[[2]]
     datas <- datas [[1]]
@@ -580,7 +661,19 @@ checkD <- function(input, output, session, datas) {
       columns = "outliers",
       target = "row",
       backgroundColor = styleEqual(1, "lightsalmon")
-    )
+    ) %>% formatStyle(
+      columns = colnames(datas),
+      backgroundColor = styleEqual(vals, rep("cyan", length(vals)))
+    )} else {
+      datas <- outliersADtab1()
+      vals <- datas[[2]]
+      datas <- datas [[1]]
+      print ('User choice table')
+      DT::datatable(datas) %>% formatStyle(
+        columns = colnames(datas),
+        backgroundColor = styleEqual(vals, rep("cyan", length(vals)))
+      )
+    }
   })
 
   # Observe function that will run on NULL values (observing selection of rows for removal)
@@ -588,7 +681,7 @@ checkD <- function(input, output, session, datas) {
     input$"outliersADtab2_rows_selected"
     isolate({
       # do stuff here
-      print(input$"outliersADtab2_rows_selected")
+      #print(input$"outliersADtab2_rows_selected")
     })
   })
 
@@ -600,19 +693,23 @@ checkD <- function(input, output, session, datas) {
   outliersADtab3 <- reactive({
     datas <- outliersADtab1()
     datas <- datas [[1]]
-
-    if (is.null(input$"outliersADtab2_rows_selected")) {
-      datas <- datas[which(datas[, ncol(datas)] == 1), ]
+    if (input$rbSl == 'USER'){
+      # if (is.null(input$"outliersADtab2_rows_selected")) {
+      #   datas <- datas[which(datas[, ncol(datas)] == 1), ]
+      # } else {
+        if (length(input$"outliersADtab2_rows_selected") == 1) {
+          datas <- datas[input$"outliersADtab2_rows_selected", ]
+          t(datas)
+        }
+        else {
+          datas <- datas[input$"outliersADtab2_rows_selected", ]
+        }
+      #}
+      data.frame(datas)
     } else {
-      if (length(input$"outliersADtab2_rows_selected") == 1) {
-        datas <- datas[input$"outliersADtab2_rows_selected", ]
-        t(datas)
-      }
-      else {
-        datas <- datas[input$"outliersADtab2_rows_selected", ]
-      }
+      datas <- datas[which(datas[, ncol(datas)] == 1), ]
+      data.frame(datas)
     }
-    data.frame(datas)
   })
 
   # outliers advanced, tab 3 Output
