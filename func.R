@@ -447,24 +447,16 @@ lm_boxcoxNew <- function (y) {
 
 #Working size & organic correction function
 correct <- function(datas, trg, dff, corFor) {
-  
-  #print ('inside of corrfunc')
+
   x <- as.data.frame(datas)
   x[,3:ncol(x)] <- apply (x[,3:ncol(x)],2, as.numeric)
-  
   l <- NULL
-  
   coefsOut <- list()
   k <- 1
   j <- 1
-  
-  #print ('getting in the function')
-  #print (dff)
-  
+
   for (i in seq(1:dim(dff)[1])) { #for each formula in the table
-    print (i)
     f <- dff[i, ] #extract formula
-    
     datas <- x #extract source
     datas <- datas[which(datas[, 2] == as.character(f[[8]])), ] #extract class
     
@@ -474,24 +466,18 @@ correct <- function(datas, trg, dff, corFor) {
     #print ('attempt to evaluate')
     element <- eval((parse(text = vals[[1]][1]))) #convert src element concentration
     
-    print (corFor)
-    
     if (length(corFor) > 1){
       var1 <- datas[,corFor[1]] # get source data (x)
       var2 <- datas[,corFor[2]] # get source data (y)
 
       #will be helpful in the future
-      #print ('next attempt to evaluate')
       fit <- lm(eval((parse(text = as.character(f[[6]]))))) #evaluate equation
-     # print (fit)
       #get conversions needed
-      #print ('evaluated')
       vals_n <- vals[[1]][2]
       vals_n <- strsplit(vals_n, " ")
       size_f <- vals_n[[1]][grep("var1", vals_n[[1]])]
       toc_f <- vals_n[[1]][grep("var2", vals_n[[1]])]
       
-      #print ('success')
       #convert source data, size
       if (length(var1) == 0) {
       } else {
@@ -503,11 +489,8 @@ correct <- function(datas, trg, dff, corFor) {
         sourceToc <- eval(parse(text = toc_f))
       }
       
-  
       var1 <- as.numeric(trg[corFor[1]]) #use values of only first target
       var2 <- as.numeric(trg[corFor[2]]) 
-      
-      #print (vals)
       
       targetSize <- eval(parse(text = size_f)) #convert them
       targetToc <- eval(parse(text = toc_f)) #convert values
@@ -515,11 +498,6 @@ correct <- function(datas, trg, dff, corFor) {
       # Drop intercept if there any from coefficients
       coefs <- coefficients(fit)[names(coefficients(fit)) != "(Intercept)"]
       coefs <- as.numeric(coefs)
-      #print (coefs)
-      
-      #print ('coefs')
-      
-      
       Yi <- element
       Si <- sourceSize
       Ti <- sourceToc
@@ -539,8 +517,6 @@ correct <- function(datas, trg, dff, corFor) {
       var1 <- as.numeric(trg[corFor]) #use values of only first target
       targetSize <- eval(parse(text = size_f)) #convert them
       # Drop intercept if there any from coefficients
-      #print ('one element')
-      #print (coefficients(fit))
       coefs <- coefficients(fit)[names(coefficients(fit)) != "(Intercept)"]
       coefs <- list(as.numeric(coefs))
       
@@ -551,24 +527,18 @@ correct <- function(datas, trg, dff, corFor) {
       Tj <- NULL
       
     }
-    
-    #print (length(coefs))
+
     
     if (length(coefs) == 3) {
       Ss <- coefs[1] # Size slope
       Ts <- coefs[2] # Toc slope
       TjSj <- coefs[3] # Interaction slope
       Corrected <- (Yi - (((Si - Sj) * Ss) + ((Ti - Tj) * Ts) + (((Si * Ti) - (Sj * Tj)) * TjSj)))
-      #print ('Corrected')
-      #print ('3 element correction applied')
-      #print (Corrected)
     } else if (length(coefs) == 2) {
       if (length(size_f) == 0) { # toc and interaction
         Ts <- coefs[1]
         TjSj <- coefs[2]
         Corrected <- (Yi - (((Ti - Tj) * Ts)) + (((Si * Ti) - (Sj * Tj)) * TjSj))
-        #print ('toc correction w interact ')
-        #print (Correct)
       }
       else if (length(toc_f) == 0) { # size and interaction
         Ss <- coefs[1]
@@ -578,22 +548,16 @@ correct <- function(datas, trg, dff, corFor) {
         Ss <- coefs[1]
         Ts <- coefs[2]
         Corrected <- (Yi - (((Si - Sj) * Ss) + ((Ti - Tj) * Ts)))
-        #print ('size correction w interaction')
-        #print (Corrected)
       }
     } else if (length(coefs) == 1) {
       if (length(size_f) == 0) {
         Ts <- coefs[[1]]
         Corrected <- (Yi - ((Ti - Tj) * Ts))
-        #print ('toc only')
-        #print (Corrected)
       } # toc
       else {
         Ss <- coefs[[1]]
         Corrected <- (Yi - ((Si - Sj) * Ss))
-        #print ('size only')
-        #print (Corrected)
-      } # size
+      }
     }
     
     dat <- as.character(f[6][1][[1]])
@@ -608,7 +572,6 @@ correct <- function(datas, trg, dff, corFor) {
     
     if (grepl("x^2", varElement, fixed = T)) {
       Corrected <- sqrt(Corrected)
-      #print(Corrected)
     } else if (grepl("x^(1/3)", varElement, fixed = T)) {
       Corrected <- Corrected^3
     } else if (grepl("x^(-1)", varElement, fixed = T)) {
@@ -618,51 +581,23 @@ correct <- function(datas, trg, dff, corFor) {
     } else if (grepl("log10(x)", varElement, fixed = T)) {
       Corrected <- exp(Corrected)
     }
-    
-    #print ('final after transforming back')
-    #print (Corrected)
-    
     options(warn=0)
-    
-    #print (Corrected)
-    
-    #print (paste0('Printing',i))
 
     if (any(is.na(as.numeric(Corrected)))) {
       Corrected <- initialConc
-      #print ('there is NA')
-      #print (f[[6]])
       l[j] <- f[[6]]
       j<-j+1
     }
     
     if (any(Corrected < 0)) {
       Corrected <- initialConc
-      #print ('SOMETHING below 0')
-      #print (f[[6]])
-      #print (l[j])
       l[j] <- f[[6]]
       j<-j+1
     }
-    
-    #print ('printing coefs')
-    
     coefsOut[[k]] <- coefs
-    #print (coefsOut[[k]])
-    #print (k)
-    #print (coefsOut[[k]])
-    
     k <- k +1
-    #print ('attempt to save')
-    #print (length (Corrected))
-    #print (nrow(x))
     x[which(x[, 2] == as.character(f[[8]])), which(names(x) == as.character(f[[1]])) ] <- Corrected
-    #print ('outside of correction loop')
   }
-  
-  #print (dim(data.frame(x)))
-  #print (coefsOut)
-  #print (l)
   return(list(data.frame(x), coefsOut, l))
 }
 

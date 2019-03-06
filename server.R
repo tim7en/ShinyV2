@@ -20,6 +20,10 @@ source("input_mod.R")
 library("shiny")
 library("DT")
 library(parallel)
+
+sessionInfo()
+
+
 numCores <- detectCores() - 1
 
 
@@ -150,10 +154,10 @@ server <- function(input, output, session) {
       dat <- src_corr_function()
       val_table <- dat
       varr <- val_table %>% group_by(source, element)
-      f <- varr %>% arrange(-desc(residualsSD), desc(Cooks), .by_group = TRUE)
+      f <- varr %>% dplyr::arrange(-desc(residualsSD), desc(Cooks), .by_group = TRUE)
       f <- f %>%
-        group_by(source, element) %>%
-        mutate(rank = rank(-desc(residualsSD), ties.method = "first"))
+        dplyr::group_by(source, element) %>%
+        dplyr::mutate(rank = rank(-desc(residualsSD), ties.method = "first"))
       f <- f[, -which(names(f) %in% c("formula", "grade", "Cooks", "residualsSD", "p-eq", "p-resi", "p.eq", "p.resi"))]
       f <- as.data.frame(f)
       f[, 3] <- (gsub("I(datas$", replacement = "(", f[, 3], fixed = T))
@@ -203,19 +207,14 @@ server <- function(input, output, session) {
       for (i in seq(1, dim(target)[1])) {
         dat <- correct(x, target[i, ], y, input$slcC)
         output[[i]] <- dat[[1]]
-        #print ('output1 success')
         slopes[[i]] <- dat[[2]]
-        #print ('output2 success')
         if (length(dat[[3]]) > 0) {
           drops [[i]] <- dat[[3]]
-          #print ('output3 success')
         } else {
           drops[[i]] <- NA
         }
       }
       
-      #print ('loop 1 success')
-
       y <- slopes
       slopes.DT <- data.frame(matrix(NA, nrow = 8, ncol = 3))
 
@@ -228,8 +227,6 @@ server <- function(input, output, session) {
         }
         slopes.DT[i, ] <- y[[1]][[i]]
       }
-      
-      #print ('slopes success')
 
       colnames(slopes.DT) <- c("var1", "var2", "var1*var2")
       slopes.DT_names <- rep(NA, nrow(slopes.DT))
@@ -267,8 +264,7 @@ server <- function(input, output, session) {
 
   correct_src_selected_function <- reactive({
     req(corrected_function())
-    print (input$ui_src_targets)
-    #try (print (corrected_function()[[1]]))
+    # try (print (corrected_function()[[1]]))
     corrected_function() [[1]][[as.numeric(input$ui_src_targets)]]
   })
 
@@ -462,7 +458,7 @@ server <- function(input, output, session) {
         var1 <- as.numeric(datas[, slcC[1]])
         var2 <- as.numeric(datas[, slcC[2]])
       } else {
-        #print("else")
+        # print("else")
         # print(dim(datas))
         var1 <- as.numeric(datas[, slcC])
         var2 <- NULL
@@ -516,15 +512,8 @@ server <- function(input, output, session) {
 
   output$scatterplot1 <- renderScatterD3({
     req(input$xvar)
-    # req(input$yvar)
     mtdf <- correct_src_selected_function()
     dtorg <- src_ref_function()
-    
-    #print (mtdf)
-    #print (dtorg)
-    #print (input$xvar)
-    
-    
     x <- dtorg[[input$xvar]]
     Sclass <- dtorg [, 2]
     y <- mtdf[[input$xvar]]
@@ -743,7 +732,6 @@ server <- function(input, output, session) {
       uniSource <- as.character(uniSource)
       ui_src_split <- input$ui_src_split
       modelOutput <- NULL
-      #print(paste0("Mixing source: ", i))
 
       for (j in seq(1, input$mcsimulations)) {
         inputTrain <- NULL
@@ -773,11 +761,6 @@ server <- function(input, output, session) {
         }
 
         rownames(dat) <- c(as.character(inputValidate[, 1]), as.character(targetD[i, 1]))
-        # for (i3 in seq (1, nrow (dat))){
-        # output <- UseUnMixing(dat[i3,], datas, DFA, method = "Nelder-Mead")
-        # modelOutput <- rbind (modelOutput, output)
-        # }
-
         cl <- makeCluster(numCores)
 
         optimMix <- function(x) {
@@ -954,10 +937,12 @@ ui <- dashboardPage(
                       tabsetPanel(
                         tabPanel(
                           "Data",
-                          column(
-                            width = 12,
-                            DTOutput("source_origin"),
-                            style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                          box(
+                            title = "Input Table", status = "success", height = "630", width = "12", solidHeader = T,
+                            column(
+                              width = 12,
+                              DTOutput("source_origin"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
+                            )
                           )
                         ),
                         navbarMenu(
@@ -1016,10 +1001,12 @@ ui <- dashboardPage(
                       tabsetPanel(
                         tabPanel(
                           "Data",
-                          column(
-                            width = 12,
-                            DTOutput("trgs_origin"),
-                            style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+                          box(
+                            title = "Target Table", status = "success", height = "630", width = "12", solidHeader = T,
+                            column(
+                              width = 12,
+                              DTOutput("trgs_origin"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
+                            )
                           )
                         ),
                         navbarMenu(
@@ -1180,10 +1167,8 @@ ui <- dashboardPage(
                       tabPanel(
                         "Edit selection",
                         box(
-                          # tags$style(HTML(".js-irs-1 .irs-single, .js-irs-1 .irs-bar-edge, .js-irs-1 .irs-bar {background: green;}")),
-                          # tags$style(HTML(".js-irs-1 .irs-single, .js-irs-1 .irs-bar-edge, .js-irs-1 .irs-grid-text { font-size: 10pt;}")),
                           title = "Outliers ", status = "success", height =
-                            "695", width = 12, solidHeader = T,
+                            "595", width = 12, solidHeader = T,
                           column(
                             width = 12,
                             outliersADtab2("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
@@ -1194,7 +1179,7 @@ ui <- dashboardPage(
                         "Standard deviates",
                         box(
                           title = "Standard Normal Deviate", status = "success", height =
-                            "695", width = 12, solidHeader = T,
+                            "595", width = 12, solidHeader = T,
                           column(
                             width = 12,
                             stdTab1("dat1"), style = "height:500px; overflow-y: scroll;overflow-x: scroll;"
@@ -1264,6 +1249,7 @@ ui <- dashboardPage(
                       DTOutput("corr_formulas_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
                     ),
                     box(
+                      uiOutput("ui_formulas_selected"),
                       title = "Selected", status = "primary", height =
                         "auto", solidHeader = T,
                       DTOutput("correct_formulas_output"), style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
@@ -1279,7 +1265,6 @@ ui <- dashboardPage(
                     box(
                       title = "Plots", status = "success", height =
                         "auto", solidHeader = T,
-                      uiOutput("ui_formulas_selected"),
                       uiOutput("ui_corvar_plot"),
                       plotOutput("regression_plot_output")
                     )
@@ -1324,7 +1309,7 @@ ui <- dashboardPage(
                     title = "Dropped", status = "warning", height = "800", solidHeader = T,
                     column(
                       width = 12,
-                      DTOutput("correct_src_drops_output"), style = "height:'600'; overflow-y: scroll;overflow-x: scroll;"
+                      DTOutput("correct_src_drops_output"), style = "height:600px; overflow-y: scroll;overflow-x: scroll;"
                     )
                   )
                 )
@@ -1349,24 +1334,29 @@ ui <- dashboardPage(
       ),
       tabItem(
         "Bracket",
-        # tabPanel(
-        #   "Bracket test",
         fluidPage(
           uiOutput("brack_range"),
           sidebarLayout(
             div(
               style = "width: 50%;",
-            sidebarPanel(
-              # textOutput('targetDrop'),
-              br(),
-              br(),
-              # uiOutput ('ui_dfa_remove'),
-              DTOutput("target_droplist_output"),
-              style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
-            ), width = 4),
+              sidebarPanel(
+                br(),
+                br(),
+                DTOutput("target_droplist_output"),
+                style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+              ), width = 2
+            ),
             mainPanel(
-              DTOutput("targets_brackets_output"),
-              style = "height:'auto'; overflow-y: scroll;overflow-x: scroll;"
+              width = 10,
+              box(
+                title = "Target Brackets", status = "success", height =
+                  "595", width = 12, solidHeader = T,
+                column(
+                  width = 12,
+                  DTOutput("targets_brackets_output"),
+                  style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+                )
+              )
             )
           )
         )
@@ -1379,11 +1369,12 @@ ui <- dashboardPage(
             sidebarLayout(
               div(
                 style = "width: 50%;",
-              sidebarPanel(
-                uiOutput("rbDFA"),
-                uiOutput("ui_dfa_remove"),
-                actionButton("applyDFA", "Apply")
-              ), width = 4),
+                sidebarPanel(
+                  uiOutput("rbDFA"),
+                  uiOutput("ui_dfa_remove"),
+                  actionButton("applyDFA", "Apply")
+                ), width = 4
+              ),
               mainPanel(
                 column(
                   width = 12,
@@ -1401,36 +1392,27 @@ ui <- dashboardPage(
             sidebarLayout(
               div(
                 style = "width: 50%;",
-              sidebarPanel(
-                uiOutput("ui_src_applymix"),
-                uiOutput("ui_src_split"),
-                uiOutput("radioBut"),
-                uiOutput("selectTarget"),
-                numericInput("mcsimulations", "Monte carlo simulations:", 2, min = 1, max = 1000)
-              ), width = 4),
+                sidebarPanel(
+                  uiOutput("ui_src_applymix"),
+                  uiOutput("ui_src_split"),
+                  uiOutput("radioBut"),
+                  uiOutput("selectTarget"),
+                  numericInput("mcsimulations", "Monte carlo simulations:", 2, min = 1, max = 1000)
+                ), width = 4
+              ),
               mainPanel(
                 tabsetPanel(
                   tabPanel(
-                      'Table',
-                      withSpinner(DTOutput("mixingOutput")), style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
-                    ),
-                    tabPanel(
-                      'Plot',
-                      uiOutput("targetPlot"),
-                      plotOutput("trg_mixing_plot", width = "100%")
-                    )
+                    "Table",
+                    withSpinner(DTOutput("mixingOutput")),
+                    style = "height:auto; overflow-y: scroll;overflow-x: scroll;"
+                  ),
+                  tabPanel(
+                    "Plot",
+                    uiOutput("targetPlot"),
+                    plotOutput("trg_mixing_plot", width = "100%")
                   )
-                
-                  # uiOutput ('srcPlot'),
-                  # fluidRow (
-                  # column(
-                  #  width = 6,
-                 # ,
-                # column(
-                # width =6,
-                # plotOutput ('src_mixing_plot', width = '100%')
-                # )
-                # )
+                )
               )
             )
           )

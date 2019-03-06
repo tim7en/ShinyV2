@@ -1,7 +1,7 @@
 library(shiny)
 library(DT)
-library (plotly)
-library (ggplot2)
+library(plotly)
+library(ggplot2)
 # # Module UI function
 csvFileInput <- function(id, label = "CSV file") {
   # Create a namespace function using the provided id
@@ -31,7 +31,7 @@ csvFile <- function(input, output, session, stringsAsFactors) {
   # The user's data, parsed into a data frame
   dataframe <- reactive({
     options(warn = -1)
-    #cat ('user inp read')
+    # cat ('user inp read')
     x <- read.csv(userFile()$datapath)
     options(warn = 1)
     x
@@ -57,7 +57,7 @@ columnChooserUI <- function(id) {
 columnChooser <- function(input, output, session, ImProxy) {
   output$controls <- renderUI({
     ns <- session$ns
-    print ('column names')
+    print("column names")
     checkboxGroupInput(ns("col"), "Columns", names(ImProxy()), selected = names(ImProxy()))
   })
   return(reactive({
@@ -109,7 +109,7 @@ inputMod <- function(input, output, session, ImProxy) {
   output$corType <- renderUI({
     ns <- session$ns
     req(ImProxy())
-    selectInput(ns("corType"), "Type", c("full","lower", "upper"))
+    selectInput(ns("corType"), "Type", c("full", "lower", "upper"))
   })
 
   output$tl.cex <- renderUI({
@@ -138,7 +138,7 @@ inputMod <- function(input, output, session, ImProxy) {
     M <- cor(dat[, input$col[-c(1, 2)]])
     M[M < input$corR & M > -input$corR] <- 0
     p <- corrplot(M, method = input$corMethod, order = "hclust", input$corType, tl.cex = input$tl.cex, diag = FALSE)
-    #p <- ggplotly(p)
+    # p <- ggplotly(p)
   })
 
   # corrplot of src with distributions
@@ -221,7 +221,7 @@ nStd <- function(id) {
 
 rbSl <- function(id) {
   ns <- NS(id)
-  uiOutput (ns('rbSl'))
+  uiOutput(ns("rbSl"))
 }
 
 outliersTab1 <- function(id) {
@@ -375,125 +375,122 @@ checkD <- function(input, output, session, datas) {
   # plotOutput of shapiro wilk transformations, before and after
   output$getspQQval <- renderPlotly({
     req(is.factor(datas()[, 2]))
-    methods_dataframe <- data.frame(getspMethods ())
-    #print (getspMethods())
+    methods_dataframe <- data.frame(getspMethods())
+    # print (getspMethods())
     req(getspQQval())
-    req (input$spPlotpick)
+    req(input$spPlotpick)
     datas <- getspQQval()
-    tryCatch({
-      dat <- datas
-      dat <- dat[order(dat[, 2]), ]
-      suppressMessages(attach(dat))
-      suppressWarnings(assign("val", get(input$spPlotpick)))
-      colnames(dat)[2] <- "Classes"
-      plot_annot <- data.frame (as.character(rownames(methods_dataframe)),as.character(methods_dataframe[input$spPlotpick]))
-      uniSource <- unique(as.character (rownames(methods_dataframe)))
-      #uniAnnot <- as.character(methods_dataframe[input$spPlotpick])
-      
-      uniAnnot <- (as.character(methods_dataframe[input$spPlotpick][,1]))
-      colnames(plot_annot) <- NULL
-      plot_dataframe <- cbind(dat[input$spPlotpick], dat$Classes)
-      plot_dataframe$annot <- 0
-      
-      for (i in seq (1,length(uniSource))){
-        ind <- which(as.character(plot_dataframe[,2]) == as.character(uniSource[i]))
-        plot_dataframe$annot[ind] <- uniAnnot[[i]]
-      }
-      colnames(plot_dataframe) <- c(input$spPlotpick, 'Classes', 'Label')
-      plot_dataframe[,2] <- paste(plot_dataframe[,2],plot_dataframe[,3], sep = ": ")
-      #print (head(plot_dataframe))
-      
-      #print(
-       # ggplotly(
-      p <- ggplot(plot_dataframe, aes(sample = val, colour = Classes)) +
-            stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
-            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))#, legend.position = 'bottom')
-      #ggplotly(p) %>%
-       # layout(legend = list(orientation = "h", x = 0, y = -0.2))
-       # )
-     # )
-    }, warning = function(cond) {}, error = function(cond) {})
-  })
-
-  output$getorigQQval <- renderPlotly({
-    req(is.factor(datas()[, 2]))
-    req (input$spPlotpick)
-
-    tryCatch({
-      dat <- datas()
-      dat <- dat[order(dat[, 2]), ]
-      suppressMessages(attach(dat))
-      suppressWarnings(assign("val", get(input$spPlotpick)))
-      colnames(dat)[2] <- "Classes"
-      #print(
-       # ggplotly(
-      p <- ggplot(dat, aes(sample = val, colour = Classes)) +
-            stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") + 
-            stat_qq_line()+ theme(panel.spacing = unit(2, "lines"))#, legend.position = 'bottom')
-      # ggplotly(p) %>%
-      #   layout(legend = list(orientation = "h", x = 0, y = -0.2))
-        #)
-     # )
-      
-    }, warning = function(cond) {}, error = function(cond) {})
-  })
-  
-  # plotOutput of shapiro wilk transformations, before and after
-  output$getspQQval2 <- renderPlotly({
-    req(is.factor(datas()[, 2]))
-    methods_dataframe <- data.frame(getspMethods ())
-    #print (getspMethods())
-    req(getspQQval())
-    req (input$spPlotpick)
-    datas <- getspQQval()
-    #tryCatch({
+    # tryCatch({
     dat <- datas
     dat <- dat[order(dat[, 2]), ]
     suppressMessages(attach(dat))
     suppressWarnings(assign("val", get(input$spPlotpick)))
     colnames(dat)[2] <- "Classes"
-    plot_annot <- data.frame (as.character(rownames(methods_dataframe)),as.character(methods_dataframe[input$spPlotpick]))
-    uniSource <- unique(as.character (rownames(methods_dataframe)))
-    #uniAnnot <- as.character(methods_dataframe[input$spPlotpick])
-    
-    uniAnnot <- (as.character(methods_dataframe[input$spPlotpick][,1]))
+    plot_annot <- data.frame(as.character(rownames(methods_dataframe)), as.character(methods_dataframe[input$spPlotpick]))
+    uniSource <- unique(as.character(rownames(methods_dataframe)))
+    # uniAnnot <- as.character(methods_dataframe[input$spPlotpick])
+
+    uniAnnot <- (as.character(methods_dataframe[input$spPlotpick][, 1]))
     colnames(plot_annot) <- NULL
     plot_dataframe <- cbind(dat[input$spPlotpick], dat$Classes)
     plot_dataframe$annot <- 0
-    
-    for (i in seq (1,length(uniSource))){
-      ind <- which(as.character(plot_dataframe[,2]) == as.character(uniSource[i]))
+
+    for (i in seq(1, length(uniSource))) {
+      ind <- which(as.character(plot_dataframe[, 2]) == as.character(uniSource[i]))
       plot_dataframe$annot[ind] <- uniAnnot[[i]]
     }
-    colnames(plot_dataframe) <- c(input$spPlotpick, 'Classes', 'Label')
-    plot_dataframe[,2] <- paste(plot_dataframe[,2],plot_dataframe[,3], sep = ": ")
-    
+    colnames(plot_dataframe) <- c(input$spPlotpick, "Classes", "Label")
+    plot_dataframe[, 2] <- paste(plot_dataframe[, 2], plot_dataframe[, 3], sep = ": ")
+    # print (head(plot_dataframe))
+
+    # print(
+    # ggplotly(
     p <- ggplot(plot_dataframe, aes(sample = val, colour = Classes)) +
       stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
-      stat_qq_line()+ theme(panel.spacing = unit(2, "lines"), legend.position = 'bottom')
-    ggplotly(p,height = 800, width = 1000 ) %>%
-    layout(legend = list(orientation = "h", x = 0, y = -0.2))
-    #}, warning = function(cond) {}, error = function(cond) {})
+      stat_qq_line() + theme(panel.spacing = unit(2, "lines"), legend.position = "bottom")
+    ggplotly(p, height = 400, width = 600) %>%
+      layout(legend = list(orientation = "h", x = 0, y = -0.2))
+
+    # }, warning = function(cond) {}, error = function(cond) {})
   })
-  
-  output$getorigQQval2 <- renderPlotly({
+
+  output$getorigQQval <- renderPlotly({
     req(is.factor(datas()[, 2]))
-    req (input$spPlotpick)
-    
-    #tryCatch({
+    req(input$spPlotpick)
+
+    # tryCatch({
     dat <- datas()
     dat <- dat[order(dat[, 2]), ]
     suppressMessages(attach(dat))
     suppressWarnings(assign("val", get(input$spPlotpick)))
     colnames(dat)[2] <- "Classes"
-    
+
+
     p <- ggplot(dat, aes(sample = val, colour = Classes)) +
-      stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") + 
-      stat_qq_line()+ theme(panel.spacing = unit(2, "lines"), legend.position = 'bottom')
-    ggplotly(p ,height = 800, width = 1000 ) %>%
+      stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
+      stat_qq_line() + theme(panel.spacing = unit(2, "lines"), legend.position = "bottom")
+    ggplotly(p, height = 400, width = 600) %>%
       layout(legend = list(orientation = "h", x = 0, y = -0.2))
-    
-    #}, warning = function(cond) {}, error = function(cond) {})
+
+    # }, warning = function(cond) {}, error = function(cond) {})
+  })
+
+  # plotOutput of shapiro wilk transformations, before and after
+  output$getspQQval2 <- renderPlotly({
+    req(is.factor(datas()[, 2]))
+    methods_dataframe <- data.frame(getspMethods())
+    # print (getspMethods())
+    req(getspQQval())
+    req(input$spPlotpick)
+    datas <- getspQQval()
+    # tryCatch({
+    dat <- datas
+    dat <- dat[order(dat[, 2]), ]
+    suppressMessages(attach(dat))
+    suppressWarnings(assign("val", get(input$spPlotpick)))
+    colnames(dat)[2] <- "Classes"
+    plot_annot <- data.frame(as.character(rownames(methods_dataframe)), as.character(methods_dataframe[input$spPlotpick]))
+    uniSource <- unique(as.character(rownames(methods_dataframe)))
+    # uniAnnot <- as.character(methods_dataframe[input$spPlotpick])
+
+    uniAnnot <- (as.character(methods_dataframe[input$spPlotpick][, 1]))
+    colnames(plot_annot) <- NULL
+    plot_dataframe <- cbind(dat[input$spPlotpick], dat$Classes)
+    plot_dataframe$annot <- 0
+
+    for (i in seq(1, length(uniSource))) {
+      ind <- which(as.character(plot_dataframe[, 2]) == as.character(uniSource[i]))
+      plot_dataframe$annot[ind] <- uniAnnot[[i]]
+    }
+    colnames(plot_dataframe) <- c(input$spPlotpick, "Classes", "Label")
+    plot_dataframe[, 2] <- paste(plot_dataframe[, 2], plot_dataframe[, 3], sep = ": ")
+
+    p <- ggplot(plot_dataframe, aes(sample = val, colour = Classes)) +
+      stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
+      stat_qq_line() + theme(panel.spacing = unit(2, "lines"), legend.position = "bottom")
+    ggplotly(p, height = 800, width = 1000) %>%
+      layout(legend = list(orientation = "h", x = 0, y = -0.2))
+    # }, warning = function(cond) {}, error = function(cond) {})
+  })
+
+  output$getorigQQval2 <- renderPlotly({
+    req(is.factor(datas()[, 2]))
+    req(input$spPlotpick)
+
+    # tryCatch({
+    dat <- datas()
+    dat <- dat[order(dat[, 2]), ]
+    suppressMessages(attach(dat))
+    suppressWarnings(assign("val", get(input$spPlotpick)))
+    colnames(dat)[2] <- "Classes"
+
+    p <- ggplot(dat, aes(sample = val, colour = Classes)) +
+      stat_qq() + facet_wrap(~Classes, ncol = 2, scales = "free") +
+      stat_qq_line() + theme(panel.spacing = unit(2, "lines"), legend.position = "bottom")
+    ggplotly(p, height = 800, width = 1000) %>%
+      layout(legend = list(orientation = "h", x = 0, y = -0.2))
+
+    # }, warning = function(cond) {}, error = function(cond) {})
   })
 
   # renderUI number of standard diviates to be considered as an outlier
@@ -501,10 +498,10 @@ checkD <- function(input, output, session, datas) {
     ns <- session$ns
     sliderInput(ns("nStd"), "Deviates From Standard Normal Mean For Outliers Detection:", value = 2.576, min = 0, max = 6, step = 0.01)
   })
-  
+
   output$rbSl <- renderUI({
     ns <- session$ns
-    radioButtons(ns('rbSl'), 'User choice', choices = c('DEFAULT', 'USER'), selected = 'DEFAULT')
+    radioButtons(ns("rbSl"), "User choice", choices = c("DEFAULT", "USER"), selected = "DEFAULT")
   })
 
   # showOutliers reactive function output
@@ -647,28 +644,29 @@ checkD <- function(input, output, session, datas) {
     }
     DT::datatable(showstd()) %>% formatStyle(
       columns = c(colnames(showstd())),
-      backgroundColor = styleInterval(c(-(cut), cut), c("cyan", "white", "cyan"))#, fontWeight = "bold"
+      backgroundColor = styleInterval(c(-(cut), cut), c("cyan", "white", "cyan")) # , fontWeight = "bold"
     )
   })
 
   # outliers advanced, tab 2 -> selection and diselection of data rows
   output$outliersADtab2 <- renderDT({
-    if (input$rbSl == 'DEFAULT'){
-    datas <- outliersADtab1()
-    vals <- datas[[2]]
-    datas <- datas [[1]]
-    DT::datatable(datas) %>% formatStyle(
-      columns = "outliers",
-      target = "row",
-      backgroundColor = styleEqual(1, "lightsalmon")
-    ) %>% formatStyle(
-      columns = colnames(datas),
-      backgroundColor = styleEqual(vals, rep("cyan", length(vals)))
-    )} else {
+    if (input$rbSl == "DEFAULT") {
       datas <- outliersADtab1()
       vals <- datas[[2]]
       datas <- datas [[1]]
-      print ('User choice table')
+      DT::datatable(datas) %>% formatStyle(
+        columns = "outliers",
+        target = "row",
+        backgroundColor = styleEqual(1, "lightsalmon")
+      ) %>% formatStyle(
+        columns = colnames(datas),
+        backgroundColor = styleEqual(vals, rep("cyan", length(vals)))
+      )
+    } else {
+      datas <- outliersADtab1()
+      vals <- datas[[2]]
+      datas <- datas [[1]]
+      print("User choice table")
       DT::datatable(datas) %>% formatStyle(
         columns = colnames(datas),
         backgroundColor = styleEqual(vals, rep("cyan", length(vals)))
@@ -681,7 +679,7 @@ checkD <- function(input, output, session, datas) {
     input$"outliersADtab2_rows_selected"
     isolate({
       # do stuff here
-      #print(input$"outliersADtab2_rows_selected")
+      # print(input$"outliersADtab2_rows_selected")
     })
   })
 
@@ -693,18 +691,18 @@ checkD <- function(input, output, session, datas) {
   outliersADtab3 <- reactive({
     datas <- outliersADtab1()
     datas <- datas [[1]]
-    if (input$rbSl == 'USER'){
+    if (input$rbSl == "USER") {
       # if (is.null(input$"outliersADtab2_rows_selected")) {
       #   datas <- datas[which(datas[, ncol(datas)] == 1), ]
       # } else {
-        if (length(input$"outliersADtab2_rows_selected") == 1) {
-          datas <- datas[input$"outliersADtab2_rows_selected", ]
-          t(datas)
-        }
-        else {
-          datas <- datas[input$"outliersADtab2_rows_selected", ]
-        }
-      #}
+      if (length(input$"outliersADtab2_rows_selected") == 1) {
+        datas <- datas[input$"outliersADtab2_rows_selected", ]
+        t(datas)
+      }
+      else {
+        datas <- datas[input$"outliersADtab2_rows_selected", ]
+      }
+      # }
       data.frame(datas)
     } else {
       datas <- datas[which(datas[, ncol(datas)] == 1), ]
